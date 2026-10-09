@@ -50,32 +50,66 @@
                 android:text="1x" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/openBtn"
+                android:id="@+id/libBtn"
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Open" />
+                android:text="Library" />
         </LinearLayout>
 
-        <View
-            android:id="@+id/playGlow"
-            android:layout_width="190dp"
-            android:layout_height="190dp"
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:alpha="0.7"
-            android:background="@drawable/glow_circle" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <ImageButton
-            android:id="@+id/playPause"
-            android:layout_width="76dp"
-            android:layout_height="76dp"
-            android:layout_gravity="center"
-            android:background="@drawable/glass_circle"
-            android:contentDescription="Play or pause"
-            android:scaleType="centerInside"
-            android:padding="20dp"
-            android:src="@drawable/ic_play"
-            app:tint="@android:color/white" />
+            <ImageButton
+                android:id="@+id/skipBack"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:background="@drawable/glass_circle"
+                android:contentDescription="Back 10 seconds"
+                android:padding="15dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_rewind"
+                app:tint="@android:color/white" />
+
+            <FrameLayout
+                android:layout_width="76dp"
+                android:layout_height="76dp"
+                android:layout_marginHorizontal="28dp">
+
+                <ImageView
+                    android:id="@+id/blurBg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop" />
+
+                <ImageButton
+                    android:id="@+id/playPause"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/glass_circle"
+                    android:contentDescription="Play or pause"
+                    android:padding="20dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_play"
+                    app:tint="@android:color/white" />
+            </FrameLayout>
+
+            <ImageButton
+                android:id="@+id/skipFwd"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:background="@drawable/glass_circle"
+                android:contentDescription="Forward 10 seconds"
+                android:padding="15dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_forward"
+                app:tint="@android:color/white" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -114,10 +148,47 @@
         </LinearLayout>
     </FrameLayout>
 
-    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-        android:id="@+id/emptyOpen"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:text="Open a video" />
+    <LinearLayout
+        android:id="@+id/libraryLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?attr/colorSurface"
+        android:clickable="true"
+        android:focusable="true"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="20dp"
+            android:text="Videos"
+            android:textAppearance="?attr/textAppearanceHeadlineMedium"
+            android:textColor="?attr/colorOnSurface" />
+
+        <TextView
+            android:id="@+id/emptyText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:padding="32dp"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/grantBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:text="Allow access"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/videoList"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingBottom="12dp" />
+    </LinearLayout>
 </FrameLayout>

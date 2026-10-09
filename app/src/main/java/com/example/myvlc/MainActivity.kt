@@ -1,23 +1,38 @@
 package com.example.myvlc
 
+import android.Manifest
+import android.content.ContentUris
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Outline
+import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
-import android.graphics.RenderEffect
-import android.graphics.Shader
-import android.content.Intent
+import android.provider.MediaStore
+import android.provider.Settings
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.TextureView
 import android.view.View
+import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.myvlc.databinding.ActivityMainBinding
 import com.google.android.material.slider.Slider
 import org.videolan.libvlc.LibVLC
@@ -29,19 +44,40 @@ class MainActivity : AppCompatActivity() {
     private lateinit var b: ActivityMainBinding
     private lateinit var libVLC: LibVLC
     private lateinit var player: MediaPlayer
+    private lateinit var adapter: VideoAdapter
     private var pfd: ParcelFileDescriptor? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private val hideRunnable = Runnable { setControlsVisible(false) }
-    private var controlsVisible = true
+    private var controlsVisible = false
+    private var textureView: TextureView? = null
+    private val blurRunnable = object : Runnable {
+        override fun run() {
+            updateBlur()
+            if (controlsVisible && hasMedia) handler.postDelayed(this, 100)
+        }
+    }
+
     private var hasMedia = false
     private var dragging = false
+    private var inLibrary = true
+    private var needSettings = false
 
     private val speeds = floatArrayOf(1f, 1.25f, 1.5f, 2f, 0.5f, 0.75f)
     private var speedIndex = 0
 
-    private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { play(it) }
+    private val permLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) loadVideos() else {
+                needSettings = true
+                showEmpty(true)
+            }
+        }
+
+    private val backCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            showLibrary()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,14 +85,26 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
-        hideSystemBars()
 
         libVLC = LibVLC(this, arrayListOf("--no-drop-late-frames", "--no-skip-frames"))
         player = MediaPlayer(libVLC)
 
+        ViewCompat.setOnApplyWindowInsetsListener(b.libraryLayout) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(0, bars.top, 0, bars.bottom)
+            insets
+        }
+
+        adapter = VideoAdapter { play(it.uri) }
+        b.videoList.layoutManager = LinearLayoutManager(this)
+        b.videoList.adapter = adapter
+        onBackPressedDispatcher.addCallback(this, backCallback)
+
         setupUi()
         setupPlayerEvents()
-        intent?.data?.let { play(it) }
+
+        val uri = intent?.data
+        if (uri != null) play(uri) else showLibrary()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -64,17 +112,132 @@ class MainActivity : AppCompatActivity() {
         intent.data?.let { play(it) }
     }
 
+    // ---------- Library ----------
+
+    private fun videoPermission() =
+        if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_VIDEO
+        else Manifest.permission.READ_EXTERNAL_STORAGE
+
+    private fun hasPermission() =
+        ContextCompat.checkSelfPermission(this, videoPermission()) == PackageManager.PERMISSION_GRANTED
+
+    private fun ensureLibrary() {
+        if (hasPermission()) loadVideos()
+        else if (!needSettings) permLauncher.launch(videoPermission())
+        else showEmpty(true)
+    }
+
+    private fun showEmpty(noPermission: Boolean) {
+        b.emptyText.visibility = View.VISIBLE
+        b.emptyText.text = if (noPermission) "Allow access so Prism can find the videos on your device"
+        else "No videos found on this device"
+        b.grantBtn.visibility = if (noPermission) View.VISIBLE else View.GONE
+    }
+
+    private fun loadVideos() {
+        b.emptyText.visibility = View.GONE
+        b.grantBtn.visibility = View.GONE
+        Thread {
+            val list = mutableListOf<VideoItem>()
+            try {
+                val collection = if (Build.VERSION.SDK_INT >= 29)
+                    MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+                else MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                val proj = arrayOf(
+                    MediaStore.Video.Media._ID,
+                    MediaStore.Video.Media.DISPLAY_NAME,
+                    MediaStore.Video.Media.DURATION
+                )
+                contentResolver.query(
+                    collection, proj, null, null,
+                    "${MediaStore.Video.Media.DATE_ADDED} DESC"
+                )?.use { c ->
+                    val idCol = c.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                    val nameCol = c.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+                    val durCol = c.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+                    while (c.moveToNext()) {
+                        val id = c.getLong(idCol)
+                        val name = (c.getString(nameCol) ?: "Video").substringBeforeLast('.')
+                        list.add(
+                            VideoItem(
+                                ContentUris.withAppendedId(collection, id),
+                                name,
+                                c.getLong(durCol)
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                // ignore, shows empty state
+            }
+            runOnUiThread {
+                adapter.submit(list)
+                if (list.isEmpty()) showEmpty(false)
+            }
+        }.start()
+    }
+
+    private fun showLibrary() {
+        inLibrary = true
+        handler.removeCallbacksAndMessages(null)
+        if (hasMedia) player.stop()
+        hasMedia = false
+        backCallback.isEnabled = false
+        controlsVisible = false
+        b.controls.visibility = View.GONE
+        b.libraryLayout.visibility = View.VISIBLE
+
+        val c = WindowInsetsControllerCompat(window, window.decorView)
+        c.show(WindowInsetsCompat.Type.systemBars())
+        val night = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+        c.isAppearanceLightStatusBars = !night
+        c.isAppearanceLightNavigationBars = !night
+
+        ensureLibrary()
+    }
+
+    private fun showPlayer() {
+        inLibrary = false
+        hasMedia = true
+        backCallback.isEnabled = true
+        b.libraryLayout.visibility = View.GONE
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
+        setControlsVisible(true)
+    }
+
+    // ---------- UI ----------
+
     private fun setupUi() {
-        // Blurred glow behind the play/pause button (real blur on Android 12+)
+        // Frosted glass: blurred snapshot of the video behind the play/pause button
+        b.blurBg.clipToOutline = true
+        b.blurBg.outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: Outline) {
+                outline.setOval(0, 0, view.width, view.height)
+            }
+        }
         if (Build.VERSION.SDK_INT >= 31) {
-            b.playGlow.setRenderEffect(
-                RenderEffect.createBlurEffect(45f, 45f, Shader.TileMode.CLAMP)
+            b.blurBg.setRenderEffect(
+                RenderEffect.createBlurEffect(20f, 20f, Shader.TileMode.CLAMP)
             )
         }
 
-        val open = { picker.launch(arrayOf("video/*", "audio/*")) }
-        b.emptyOpen.setOnClickListener { open() }
-        b.openBtn.setOnClickListener { open() }
+        b.libBtn.setOnClickListener { showLibrary() }
+        b.grantBtn.setOnClickListener {
+            if (needSettings) {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", packageName, null)
+                    )
+                )
+            } else {
+                permLauncher.launch(videoPermission())
+            }
+        }
 
         b.playPause.setOnClickListener {
             b.playPause.animate().scaleX(0.85f).scaleY(0.85f).setDuration(80).withEndAction {
@@ -82,6 +245,9 @@ class MainActivity : AppCompatActivity() {
             }.start()
             if (player.isPlaying) player.pause() else player.play()
         }
+
+        b.skipBack.setOnClickListener { seekBy(-10_000L); scheduleHide() }
+        b.skipFwd.setOnClickListener { seekBy(10_000L); scheduleHide() }
 
         b.speedBtn.setOnClickListener {
             speedIndex = (speedIndex + 1) % speeds.size
@@ -93,6 +259,7 @@ class MainActivity : AppCompatActivity() {
                 dragging = true
                 handler.removeCallbacks(hideRunnable)
             }
+
             override fun onStopTrackingTouch(slider: Slider) {
                 player.position = slider.value
                 dragging = false
@@ -107,11 +274,10 @@ class MainActivity : AppCompatActivity() {
                 if (hasMedia) setControlsVisible(!controlsVisible)
                 return true
             }
+
             override fun onDoubleTap(e: MotionEvent): Boolean {
-                if (!hasMedia) return true
                 val back = e.x < b.touchLayer.width / 2f
-                val target = player.time + if (back) -10_000L else 10_000L
-                player.time = target.coerceIn(0L, maxOf(player.length, 0L))
+                seekBy(if (back) -10_000L else 10_000L)
                 return true
             }
         })
@@ -121,14 +287,15 @@ class MainActivity : AppCompatActivity() {
     private fun setupPlayerEvents() {
         player.setEventListener(MediaPlayer.EventListener { e ->
             runOnUiThread {
+                if (inLibrary) return@runOnUiThread
                 when (e.type) {
                     MediaPlayer.Event.Playing -> { setPlayIcon(true); scheduleHide() }
                     MediaPlayer.Event.Paused -> { setPlayIcon(false); setControlsVisible(true) }
                     MediaPlayer.Event.Stopped, MediaPlayer.Event.EndReached -> {
                         setPlayIcon(false); setControlsVisible(true)
                     }
-                    MediaPlayer.Event.LengthChanged -> b.durationText.text = fmt(e.lengthChanged)
-                    MediaPlayer.Event.TimeChanged -> b.timeText.text = fmt(e.timeChanged)
+                    MediaPlayer.Event.LengthChanged -> b.durationText.text = formatTime(e.lengthChanged)
+                    MediaPlayer.Event.TimeChanged -> b.timeText.text = formatTime(e.timeChanged)
                     MediaPlayer.Event.PositionChanged ->
                         if (!dragging) b.seekBar.value = e.positionChanged.coerceIn(0f, 1f)
                 }
@@ -143,14 +310,18 @@ class MainActivity : AppCompatActivity() {
             val media = Media(libVLC, pfd!!.fileDescriptor)
             player.media = media
             media.release()
+            inLibrary = false
             player.play()
             applySpeed()
-            hasMedia = true
-            b.emptyOpen.visibility = View.GONE
-            setControlsVisible(true)
+            showPlayer()
         } catch (e: Exception) {
             Toast.makeText(this, "Can't open this file", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun seekBy(delta: Long) {
+        if (!hasMedia) return
+        player.time = (player.time + delta).coerceIn(0L, maxOf(player.length, 0L))
     }
 
     private fun applySpeed() {
@@ -163,14 +334,43 @@ class MainActivity : AppCompatActivity() {
         b.playPause.setImageResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play)
     }
 
+    private fun findTextureView(v: View): TextureView? {
+        if (v is TextureView) return v
+        if (v is ViewGroup) {
+            for (i in 0 until v.childCount) {
+                findTextureView(v.getChildAt(i))?.let { return it }
+            }
+        }
+        return null
+    }
+
+    private fun updateBlur() {
+        val tv = textureView ?: findTextureView(b.videoLayout)?.also { textureView = it } ?: return
+        val scale = 10
+        if (!tv.isAvailable || tv.width / scale < 2 || tv.height / scale < 2) return
+        val small = tv.getBitmap(tv.width / scale, tv.height / scale) ?: return
+        val tvLoc = IntArray(2)
+        val btnLoc = IntArray(2)
+        tv.getLocationOnScreen(tvLoc)
+        b.blurBg.getLocationOnScreen(btnLoc)
+        val x = ((btnLoc[0] - tvLoc[0]) / scale).coerceIn(0, small.width - 2)
+        val y = ((btnLoc[1] - tvLoc[1]) / scale).coerceIn(0, small.height - 2)
+        val w = (b.blurBg.width / scale).coerceIn(1, small.width - x)
+        val h = (b.blurBg.height / scale).coerceIn(1, small.height - y)
+        b.blurBg.setImageBitmap(Bitmap.createBitmap(small, x, y, w, h))
+    }
+
     private fun setControlsVisible(show: Boolean) {
         controlsVisible = show
         handler.removeCallbacks(hideRunnable)
         if (show) {
             b.controls.visibility = View.VISIBLE
             b.controls.animate().alpha(1f).setDuration(200).start()
+            handler.removeCallbacks(blurRunnable)
+            handler.post(blurRunnable)
             scheduleHide()
         } else {
+            handler.removeCallbacks(blurRunnable)
             b.controls.animate().alpha(0f).setDuration(250).withEndAction {
                 if (!controlsVisible) b.controls.visibility = View.GONE
             }.start()
@@ -182,28 +382,16 @@ class MainActivity : AppCompatActivity() {
         if (player.isPlaying && controlsVisible) handler.postDelayed(hideRunnable, 3000)
     }
 
-    private fun hideSystemBars() {
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            hide(WindowInsetsCompat.Type.systemBars())
-        }
-    }
-
-    private fun fmt(ms: Long): String {
-        val s = ms / 1000
-        val h = s / 3600
-        val m = (s % 3600) / 60
-        val sec = s % 60
-        return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
-    }
-
     override fun onStart() {
         super.onStart()
-        player.attachViews(b.videoLayout, null, false, false)
+        textureView = null
+        player.attachViews(b.videoLayout, null, false, true)
+        if (inLibrary && adapter.itemCount == 0 && hasPermission()) loadVideos()
     }
 
     override fun onStop() {
         super.onStop()
+        handler.removeCallbacks(blurRunnable)
         if (player.isPlaying) player.pause()
         player.detachViews()
     }
