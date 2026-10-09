@@ -59,8 +59,8 @@
 
         <View
             android:id="@+id/playGlow"
-            android:layout_width="110dp"
-            android:layout_height="110dp"
+            android:layout_width="190dp"
+            android:layout_height="190dp"
             android:layout_gravity="center"
             android:alpha="0.7"
             android:background="@drawable/glow_circle" />
