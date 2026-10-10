@@ -30,6 +30,8 @@ import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -103,6 +105,10 @@ class MainActivity : AppCompatActivity() {
     private var allSeries: Map<String, List<VideoItem>> = emptyMap()
     private var looseVideos: List<VideoItem> = emptyList()
     private var currentSeries: String? = null
+    private var currentPlaylist: String? = null
+    private lateinit var store: PlaylistStore
+    private var allVideos: List<VideoItem> = emptyList()
+    private var byUri: Map<String, VideoItem> = emptyMap()
     private var playlist: List<VideoItem> = emptyList()
     private var playIndex = -1
 
@@ -132,12 +138,13 @@ class MainActivity : AppCompatActivity() {
         override fun handleOnBackPressed() {
             if (panelVisible) hidePanel()
             else if (!inLibrary) showLibrary()
-            else if (currentSeries != null) openSeries(null)
+            else if (currentSeries != null || currentPlaylist != null) libraryUp()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         prefs = getSharedPreferences("prism", MODE_PRIVATE)
+        store = PlaylistStore(prefs)
         themeIndex = prefs.getInt("theme", 0).coerceIn(0, themeStyles.size - 1)
         setTheme(themeStyles[themeIndex])
         if (themeIndex == 0) DynamicColors.applyToActivityIfAvailable(this)
@@ -160,7 +167,17 @@ class MainActivity : AppCompatActivity() {
 
         adapter = LibraryAdapter(
             onSeries = { name -> openSeries(name) },
-            onVideo = { item -> onVideoClicked(item) }
+            onVideo = { item -> onVideoClicked(item) },
+            onVideoLong = { item -> showVideoMenu(item) },
+            onPlaylist = { name -> openPlaylist(name) },
+            onPlaylistLong = { name -> showPlaylistMenu(name) },
+            onNewPlaylist = {
+                createPlaylistFlow { name ->
+                    openPlaylist(name)
+                    showAddVideosDialog(name)
+                }
+            },
+            onAddVideos = { currentPlaylist?.let { showAddVideosDialog(it) } }
         )
         b.videoList.layoutManager = LinearLayoutManager(this)
         b.videoList.adapter = adapter
@@ -262,7 +279,10 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 allSeries = sorted
                 looseVideos = loose
+                allVideos = list
+                byUri = (loose + sorted.values.flatten()).associateBy { it.uri.toString() }
                 if (currentSeries != null && !sorted.containsKey(currentSeries)) currentSeries = null
+                if (currentPlaylist != null && !store.names().contains(currentPlaylist)) currentPlaylist = null
                 applyLibraryHeader()
                 rebuildRows()
                 if (list.isEmpty()) showEmpty(false)
@@ -270,46 +290,211 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
+    private fun playlistVideos(name: String): List<VideoItem> =
+        store.uris(name).mapNotNull { byUri[it] }
+
     private fun rebuildRows() {
         val rows = ArrayList<Row>()
         val cs = currentSeries
-        if (cs != null) {
+        val cp = currentPlaylist
+        if (cp != null) {
+            rows.add(Row.AddVideos)
+            playlistVideos(cp).forEach { rows.add(Row.VideoRow(it)) }
+        } else if (cs != null) {
             allSeries[cs]?.forEach { rows.add(Row.VideoRow(it)) }
         } else {
+            rows.add(Row.Header("Playlists"))
+            rows.add(Row.NewPlaylist)
+            for (name in store.names()) {
+                val vids = playlistVideos(name)
+                rows.add(Row.PlaylistRow(name, vids.size, vids.firstOrNull()?.uri))
+            }
             if (allSeries.isNotEmpty()) {
                 rows.add(Row.Header("Series"))
                 for ((name, eps) in allSeries) {
                     rows.add(Row.SeriesRow(name, eps.size, eps.first().uri))
                 }
-                if (looseVideos.isNotEmpty()) rows.add(Row.Header("All videos"))
             }
-            looseVideos.forEach { rows.add(Row.VideoRow(it)) }
+            if (looseVideos.isNotEmpty()) {
+                rows.add(Row.Header("All videos"))
+                looseVideos.forEach { rows.add(Row.VideoRow(it)) }
+            }
         }
         adapter.submit(rows)
     }
 
     private fun applyLibraryHeader() {
-        val cs = currentSeries
-        b.libTitle.text = cs ?: "Videos"
-        b.libBack.visibility = if (cs != null) View.VISIBLE else View.GONE
-        if (inLibrary) backCallback.isEnabled = cs != null
+        val title = currentSeries ?: currentPlaylist
+        b.libTitle.text = title ?: "Videos"
+        b.libBack.visibility = if (title != null) View.VISIBLE else View.GONE
+        if (inLibrary) backCallback.isEnabled = title != null
     }
 
-    private fun openSeries(name: String?) {
-        currentSeries = name
+    private fun refreshLibrary() {
         applyLibraryHeader()
         rebuildRows()
         b.videoList.scrollToPosition(0)
     }
 
+    private fun refreshKeepScroll() {
+        applyLibraryHeader()
+        rebuildRows()
+    }
+
+    private fun openSeries(name: String?) {
+        currentSeries = name
+        currentPlaylist = null
+        refreshLibrary()
+    }
+
+    private fun openPlaylist(name: String?) {
+        currentPlaylist = name
+        currentSeries = null
+        refreshLibrary()
+    }
+
+    private fun libraryUp() {
+        currentSeries = null
+        currentPlaylist = null
+        refreshLibrary()
+    }
+
     private fun onVideoClicked(item: VideoItem) {
+        val cp = currentPlaylist
         val cs = currentSeries
-        if (cs != null) {
+        if (cp != null) {
+            val vids = playlistVideos(cp)
+            startPlaylist(vids, vids.indexOf(item).coerceAtLeast(0))
+        } else if (cs != null) {
             val eps = allSeries[cs] ?: listOf(item)
             startPlaylist(eps, eps.indexOf(item).coerceAtLeast(0))
         } else {
             startPlaylist(listOf(item), 0)
         }
+    }
+
+    // ---------- Your playlists ----------
+
+    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+    private fun askName(title: String, initial: String, positive: String, onDone: (String) -> Unit) {
+        val dp = resources.displayMetrics.density
+        val input = EditText(this)
+        input.hint = "Playlist name"
+        input.setSingleLine()
+        input.setText(initial)
+        input.setSelection(input.text.length)
+        val box = FrameLayout(this)
+        val pad = (20 * dp).toInt()
+        box.setPadding(pad, (8 * dp).toInt(), pad, 0)
+        box.addView(
+            input,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setView(box)
+            .setPositiveButton(positive) { _, _ -> onDone(input.text.toString()) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun createPlaylistFlow(then: (String) -> Unit) {
+        askName("New playlist", "", "Create") { typed ->
+            then(store.create(typed))
+        }
+    }
+
+    private fun showAddVideosDialog(name: String) {
+        val vids = allVideos
+        if (vids.isEmpty()) {
+            toast("No videos found yet")
+            return
+        }
+        val current = store.uris(name).toSet()
+        val titles = vids.map { it.title }.toTypedArray()
+        val checked = BooleanArray(vids.size) { vids[it].uri.toString() in current }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Add videos to " + name)
+            .setMultiChoiceItems(titles, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setPositiveButton("Done") { _, _ ->
+                val existing = store.uris(name)
+                val selected = vids.indices.filter { checked[it] }.map { vids[it].uri.toString() }
+                val kept = existing.filter { it in selected }
+                val added = selected.filter { it !in existing }
+                store.setAll(name, kept + added)
+                refreshKeepScroll()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showAddToPlaylist(item: VideoItem) {
+        val uri = item.uri.toString()
+        val names = store.names()
+        val labels = ArrayList<String>(names)
+        labels.add("New playlist…")
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Add to playlist")
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which < names.size) {
+                    store.add(names[which], uri)
+                    toast("Added to " + names[which])
+                    refreshKeepScroll()
+                } else {
+                    createPlaylistFlow { created ->
+                        store.add(created, uri)
+                        toast("Added to " + created)
+                        refreshKeepScroll()
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun showVideoMenu(item: VideoItem) {
+        val cp = currentPlaylist
+        val options = if (cp != null) arrayOf("Remove from this playlist", "Add to another playlist")
+        else arrayOf("Add to playlist")
+        MaterialAlertDialogBuilder(this)
+            .setTitle(item.title)
+            .setItems(options) { _, which ->
+                if (cp != null && which == 0) {
+                    store.remove(cp, item.uri.toString())
+                    refreshKeepScroll()
+                } else {
+                    showAddToPlaylist(item)
+                }
+            }
+            .show()
+    }
+
+    private fun showPlaylistMenu(name: String) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(name)
+            .setItems(arrayOf("Rename", "Delete")) { _, which ->
+                if (which == 0) {
+                    askName("Rename playlist", name, "Save") { typed ->
+                        store.rename(name, typed)
+                        refreshKeepScroll()
+                    }
+                } else {
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("Delete this playlist?")
+                        .setMessage("Your videos are not deleted, only the playlist.")
+                        .setPositiveButton("Delete") { _, _ ->
+                            store.delete(name)
+                            refreshKeepScroll()
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }
+            }
+            .show()
     }
 
     private fun isDarkUi(): Boolean {
@@ -447,7 +632,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         b.themeBtn.setOnClickListener { showThemeDialog() }
-        b.libBack.setOnClickListener { openSeries(null) }
+        b.libBack.setOnClickListener { libraryUp() }
         b.grantBtn.setOnClickListener {
             if (needSettings) {
                 startActivity(
