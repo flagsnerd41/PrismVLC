@@ -2,6 +2,7 @@ package com.example.myvlc
 
 import android.Manifest
 import android.content.ContentUris
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
@@ -30,6 +31,7 @@ import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -44,7 +46,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.core.widget.doAfterTextChanged
+import androidx.recyclerview.widget.GridLayoutManager
 import com.bumptech.glide.Glide
 import com.example.myvlc.databinding.ActivityMainBinding
 import com.google.android.material.color.DynamicColors
@@ -106,6 +109,10 @@ class MainActivity : AppCompatActivity() {
     private var looseVideos: List<VideoItem> = emptyList()
     private var currentSeries: String? = null
     private var currentPlaylist: String? = null
+    private lateinit var grid: GridLayoutManager
+    private var tab = 0
+    private var query = ""
+    private var searchVisible = false
     private lateinit var store: PlaylistStore
     private var allVideos: List<VideoItem> = emptyList()
     private var byUri: Map<String, VideoItem> = emptyMap()
@@ -203,7 +210,12 @@ class MainActivity : AppCompatActivity() {
             },
             onAddVideos = { currentPlaylist?.let { showAddVideosDialog(it) } }
         )
-        b.videoList.layoutManager = LinearLayoutManager(this)
+        grid = GridLayoutManager(this, computeSpan())
+        grid.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int): Int =
+                if (adapter.isFullSpan(position)) grid.spanCount else 1
+        }
+        b.videoList.layoutManager = grid
         b.videoList.adapter = adapter
         onBackPressedDispatcher.addCallback(this, backCallback)
 
@@ -321,37 +333,84 @@ class MainActivity : AppCompatActivity() {
         val rows = ArrayList<Row>()
         val cs = currentSeries
         val cp = currentPlaylist
+        var listMode = false
         if (cp != null) {
+            listMode = true
             rows.add(Row.AddVideos)
             playlistVideos(cp).forEach { rows.add(Row.VideoRow(it)) }
         } else if (cs != null) {
+            listMode = true
             allSeries[cs]?.forEach { rows.add(Row.VideoRow(it)) }
-        } else {
-            rows.add(Row.Header("Playlists"))
+        } else if (tab == 1) {
+            if (allSeries.isEmpty()) {
+                rows.add(Row.Note("No series found yet.\nName files like  Show S01E01  and they will appear here."))
+            } else {
+                for ((name, eps) in allSeries) {
+                    rows.add(Row.SeriesRow(name, eps.size, eps.first().uri))
+                }
+            }
+        } else if (tab == 2) {
             rows.add(Row.NewPlaylist)
             for (name in store.names()) {
                 val vids = playlistVideos(name)
                 rows.add(Row.PlaylistRow(name, vids.size, vids.firstOrNull()?.uri))
             }
-            if (allSeries.isNotEmpty()) {
-                rows.add(Row.Header("Series"))
-                for ((name, eps) in allSeries) {
-                    rows.add(Row.SeriesRow(name, eps.size, eps.first().uri))
-                }
-            }
-            if (looseVideos.isNotEmpty()) {
-                rows.add(Row.Header("All videos"))
-                looseVideos.forEach { rows.add(Row.VideoRow(it)) }
+        } else {
+            val q = query.lowercase()
+            val vids = allVideos
+                .map { byUri[it.uri.toString()] ?: it }
+                .filter { q.isEmpty() || it.title.lowercase().contains(q) }
+            if (vids.isEmpty() && allVideos.isNotEmpty()) {
+                rows.add(Row.Note("No videos match your search"))
+            } else {
+                vids.forEach { rows.add(Row.VideoRow(it)) }
             }
         }
-        adapter.submit(rows)
+        adapter.submit(rows, listMode)
     }
 
     private fun applyLibraryHeader() {
         val title = currentSeries ?: currentPlaylist
-        b.libTitle.text = title ?: "Videos"
-        b.libBack.visibility = if (title != null) View.VISIBLE else View.GONE
-        if (inLibrary) backCallback.isEnabled = title != null
+        val detail = title != null
+        if (detail) closeSearch()
+        b.libTitle.text = title ?: "Prism"
+        b.libBack.visibility = if (detail) View.VISIBLE else View.GONE
+        b.libLogo.visibility = if (detail) View.GONE else View.VISIBLE
+        b.tabGroup.visibility = if (detail) View.GONE else View.VISIBLE
+        b.searchBtn.visibility = if (detail) View.GONE else View.VISIBLE
+        b.searchBox.visibility = if (!detail && searchVisible) View.VISIBLE else View.GONE
+        if (inLibrary) backCallback.isEnabled = detail
+    }
+
+    private fun toggleSearch() {
+        searchVisible = !searchVisible
+        b.searchBox.visibility = if (searchVisible) View.VISIBLE else View.GONE
+        if (searchVisible) {
+            b.searchBox.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(b.searchBox, 0)
+        } else {
+            b.searchBox.setText("")
+            hideKeyboard()
+        }
+    }
+
+    private fun closeSearch() {
+        if (!searchVisible) return
+        searchVisible = false
+        b.searchBox.visibility = View.GONE
+        b.searchBox.setText("")
+        hideKeyboard()
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(b.searchBox.windowToken, 0)
+    }
+
+    private fun computeSpan(): Int {
+        val widthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density
+        return (widthDp / 170f).toInt().coerceIn(2, 6)
     }
 
     private fun refreshLibrary() {
@@ -386,12 +445,16 @@ class MainActivity : AppCompatActivity() {
     private fun onVideoClicked(item: VideoItem) {
         val cp = currentPlaylist
         val cs = currentSeries
+        val itemSeries = item.series
         if (cp != null) {
             val vids = playlistVideos(cp)
-            startPlaylist(vids, vids.indexOf(item).coerceAtLeast(0))
+            startPlaylist(vids, vids.indexOfFirst { it.uri == item.uri }.coerceAtLeast(0))
         } else if (cs != null) {
             val eps = allSeries[cs] ?: listOf(item)
-            startPlaylist(eps, eps.indexOf(item).coerceAtLeast(0))
+            startPlaylist(eps, eps.indexOfFirst { it.uri == item.uri }.coerceAtLeast(0))
+        } else if (itemSeries != null) {
+            val eps = allSeries[itemSeries] ?: listOf(item)
+            startPlaylist(eps, eps.indexOfFirst { it.uri == item.uri }.coerceAtLeast(0))
         } else {
             startPlaylist(listOf(item), 0)
         }
@@ -664,6 +727,24 @@ class MainActivity : AppCompatActivity() {
         }
 
         b.themeBtn.setOnClickListener { showThemeDialog() }
+        b.searchBtn.setOnClickListener { toggleSearch() }
+        b.searchBox.doAfterTextChanged { text ->
+            query = (text?.toString() ?: "").trim()
+            if (query.isNotEmpty() && tab != 0) b.chipVideos.isChecked = true
+            else refreshKeepScroll()
+        }
+        b.searchBox.setOnEditorActionListener { _, _, _ ->
+            hideKeyboard()
+            true
+        }
+        b.tabGroup.setOnCheckedStateChangeListener { _, ids ->
+            tab = when (ids.firstOrNull()) {
+                R.id.chipSeries -> 1
+                R.id.chipPlaylists -> 2
+                else -> 0
+            }
+            refreshLibrary()
+        }
         b.libBack.setOnClickListener { libraryUp() }
         b.grantBtn.setOnClickListener {
             if (needSettings) {
@@ -695,18 +776,18 @@ class MainActivity : AppCompatActivity() {
             if (player.isPlaying) player.pause() else player.play()
         }
 
-        b.seekBar.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
-            override fun onStartTrackingTouch(slider: Slider) {
-                dragging = true
-                handler.removeCallbacks(hideRunnable)
-            }
-
-            override fun onStopTrackingTouch(slider: Slider) {
-                player.position = slider.value
-                dragging = false
-                scheduleHide()
-            }
-        })
+        b.seekBar.onSeekStart = {
+            dragging = true
+            handler.removeCallbacks(hideRunnable)
+        }
+        b.seekBar.onSeekPreview = { p ->
+            b.timeText.text = formatTime((p * maxOf(player.length, 0L)).toLong())
+        }
+        b.seekBar.onSeekEnd = { p ->
+            player.position = p
+            dragging = false
+            scheduleHide()
+        }
 
         // Tap = show/hide controls, double tap left/right = seek -/+10s
         val gestures = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
@@ -742,10 +823,14 @@ class MainActivity : AppCompatActivity() {
                         if (hasNext()) playNext()
                         else { setPlayIcon(false); setControlsVisible(true) }
                     }
-                    MediaPlayer.Event.LengthChanged -> b.durationText.text = formatTime(e.lengthChanged)
-                    MediaPlayer.Event.TimeChanged -> b.timeText.text = formatTime(e.timeChanged)
+                    MediaPlayer.Event.LengthChanged -> {
+                        b.durationText.text = formatTime(e.lengthChanged)
+                        b.seekBar.durationMs = e.lengthChanged
+                    }
+                    MediaPlayer.Event.TimeChanged ->
+                        if (!dragging) b.timeText.text = formatTime(e.timeChanged)
                     MediaPlayer.Event.PositionChanged ->
-                        if (!dragging) b.seekBar.value = e.positionChanged.coerceIn(0f, 1f)
+                        if (!dragging) b.seekBar.updateProgress(e.positionChanged)
                 }
             }
         })
@@ -1014,6 +1099,11 @@ class MainActivity : AppCompatActivity() {
         if (player.isPlaying && controlsVisible && !panelVisible) {
             handler.postDelayed(hideRunnable, 3500)
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        grid.spanCount = computeSpan()
     }
 
     override fun onStart() {

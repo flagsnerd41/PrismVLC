@@ -20,6 +20,7 @@ data class VideoItem(
 
 sealed class Row {
     data class Header(val text: String) : Row()
+    data class Note(val text: String) : Row()
     object NewPlaylist : Row()
     object AddVideos : Row()
     data class PlaylistRow(val name: String, val count: Int, val cover: Uri?) : Row()
@@ -55,15 +56,32 @@ class LibraryAdapter(
     private val onAddVideos: () -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    private var rows: List<Row> = emptyList()
+    companion object {
+        const val T_HEADER = 0
+        const val T_LIST = 1
+        const val T_ACTION = 2
+        const val T_CARD = 3
+        const val T_NOTE = 4
+    }
 
-    fun submit(list: List<Row>) {
+    private var rows: List<Row> = emptyList()
+    private var listMode = false
+
+    fun submit(list: List<Row>, asList: Boolean) {
         rows = list
+        listMode = asList
         notifyDataSetChanged()
     }
 
+    /** Headers, notes and action rows span the full width; video cards take half. */
+    fun isFullSpan(position: Int): Boolean = getItemViewType(position) != T_CARD
+
     class HeaderVH(v: View) : RecyclerView.ViewHolder(v) {
         val text: TextView = v.findViewById(R.id.headerText)
+    }
+
+    class NoteVH(v: View) : RecyclerView.ViewHolder(v) {
+        val text: TextView = v.findViewById(R.id.noteText)
     }
 
     class ActionVH(v: View) : RecyclerView.ViewHolder(v) {
@@ -74,21 +92,25 @@ class LibraryAdapter(
         val thumb: ImageView = v.findViewById(R.id.thumb)
         val title: TextView = v.findViewById(R.id.title)
         val duration: TextView = v.findViewById(R.id.duration)
+        val badge: TextView? = v.findViewById(R.id.badge)
     }
 
     override fun getItemCount(): Int = rows.size
 
     override fun getItemViewType(position: Int): Int = when (rows[position]) {
-        is Row.Header -> 0
-        is Row.NewPlaylist, is Row.AddVideos -> 2
-        is Row.PlaylistRow, is Row.SeriesRow, is Row.VideoRow -> 1
+        is Row.Header -> T_HEADER
+        is Row.Note -> T_NOTE
+        is Row.NewPlaylist, is Row.AddVideos -> T_ACTION
+        is Row.PlaylistRow, is Row.SeriesRow, is Row.VideoRow -> if (listMode) T_LIST else T_CARD
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         return when (viewType) {
-            0 -> HeaderVH(inflater.inflate(R.layout.item_header, parent, false))
-            2 -> ActionVH(inflater.inflate(R.layout.item_action, parent, false))
+            T_HEADER -> HeaderVH(inflater.inflate(R.layout.item_header, parent, false))
+            T_NOTE -> NoteVH(inflater.inflate(R.layout.item_note, parent, false))
+            T_ACTION -> ActionVH(inflater.inflate(R.layout.item_action, parent, false))
+            T_CARD -> ItemVH(inflater.inflate(R.layout.item_card, parent, false))
             else -> ItemVH(inflater.inflate(R.layout.item_video, parent, false))
         }
     }
@@ -97,6 +119,9 @@ class LibraryAdapter(
         when (val row = rows[position]) {
             is Row.Header -> {
                 (holder as HeaderVH).text.text = row.text
+            }
+            is Row.Note -> {
+                (holder as NoteVH).text.text = row.text
             }
             is Row.NewPlaylist -> {
                 val h = holder as ActionVH
@@ -112,6 +137,7 @@ class LibraryAdapter(
                 val h = holder as ItemVH
                 h.title.text = row.name
                 h.duration.text = row.count.toString() + " videos"
+                h.badge?.visibility = View.GONE
                 val cover = row.cover
                 h.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
                 if (cover != null) {
@@ -127,6 +153,7 @@ class LibraryAdapter(
                 val h = holder as ItemVH
                 h.title.text = row.name
                 h.duration.text = row.count.toString() + " episodes"
+                h.badge?.visibility = View.GONE
                 h.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
                 loadCover(h.thumb, row.cover)
                 h.itemView.setOnClickListener { onSeries(row.name) }
@@ -137,9 +164,18 @@ class LibraryAdapter(
                 val h = holder as ItemVH
                 val item = row.item
                 h.title.text = item.title
-                h.duration.text = if (item.series != null)
-                    String.format("S%02dE%02d · %s", item.season, item.episode, formatTime(item.durationMs))
-                else formatTime(item.durationMs)
+                if (listMode) {
+                    h.duration.text = if (item.series != null)
+                        String.format("S%02dE%02d · %s", item.season, item.episode, formatTime(item.durationMs))
+                    else formatTime(item.durationMs)
+                    h.badge?.visibility = View.GONE
+                } else {
+                    h.duration.text = if (item.series != null)
+                        String.format("S%02dE%02d · %s", item.season, item.episode, item.series)
+                    else ""
+                    h.badge?.visibility = View.VISIBLE
+                    h.badge?.text = formatTime(item.durationMs)
+                }
                 h.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
                 loadCover(h.thumb, item.uri)
                 h.itemView.setOnClickListener { onVideo(item) }

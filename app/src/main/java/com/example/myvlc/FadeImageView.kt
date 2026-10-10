@@ -27,7 +27,7 @@ class FadeImageView @JvmOverloads constructor(
         maskPaint.shader = LinearGradient(
             0f, 0f, 0f, h.toFloat(),
             intArrayOf(0x00000000, 0xFF000000.toInt(), 0xFF000000.toInt()),
-            floatArrayOf(0f, 0.55f, 1f),
+            floatArrayOf(0f, 0.4f, 1f),
             Shader.TileMode.CLAMP
         )
     }
