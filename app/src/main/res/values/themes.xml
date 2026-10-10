@@ -1,8 +1,88 @@
 <resources>
+    <!-- Default: Material You (follows wallpaper on Android 12+) -->
     <style name="Theme.MyVLC" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+
+    <style name="Theme.Prism.Base" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+
+    <style name="Theme.Prism.Ocean" parent="Theme.Prism.Base">
+        <item name="colorPrimary">#7CC4FF</item>
+        <item name="colorOnPrimary">#00344F</item>
+        <item name="colorPrimaryContainer">#004B70</item>
+        <item name="colorOnPrimaryContainer">#C7E7FF</item>
+        <item name="colorSurface">#0B1620</item>
+        <item name="colorOnSurface">#E3EAF0</item>
+        <item name="colorSurfaceVariant">#1B2B38</item>
+        <item name="colorOnSurfaceVariant">#B7C6D2</item>
+        <item name="android:colorBackground">#0B1620</item>
+    </style>
+
+    <style name="Theme.Prism.Sunset" parent="Theme.Prism.Base">
+        <item name="colorPrimary">#FFB68A</item>
+        <item name="colorOnPrimary">#512400</item>
+        <item name="colorPrimaryContainer">#723600</item>
+        <item name="colorOnPrimaryContainer">#FFDCC7</item>
+        <item name="colorSurface">#1C120C</item>
+        <item name="colorOnSurface">#F2E3DA</item>
+        <item name="colorSurfaceVariant">#342119</item>
+        <item name="colorOnSurfaceVariant">#D6C2B8</item>
+        <item name="android:colorBackground">#1C120C</item>
+    </style>
+
+    <style name="Theme.Prism.Forest" parent="Theme.Prism.Base">
+        <item name="colorPrimary">#7ADB8A</item>
+        <item name="colorOnPrimary">#003915</item>
+        <item name="colorPrimaryContainer">#00531F</item>
+        <item name="colorOnPrimaryContainer">#96F8A3</item>
+        <item name="colorSurface">#0C1710</item>
+        <item name="colorOnSurface">#E0EBE1</item>
+        <item name="colorSurfaceVariant">#1C2B20</item>
+        <item name="colorOnSurfaceVariant">#B9CCBC</item>
+        <item name="android:colorBackground">#0C1710</item>
+    </style>
+
+    <style name="Theme.Prism.Rose" parent="Theme.Prism.Base">
+        <item name="colorPrimary">#FFB1C8</item>
+        <item name="colorOnPrimary">#650033</item>
+        <item name="colorPrimaryContainer">#8D0F4B</item>
+        <item name="colorOnPrimaryContainer">#FFD9E3</item>
+        <item name="colorSurface">#1D1014</item>
+        <item name="colorOnSurface">#F3E1E6</item>
+        <item name="colorSurfaceVariant">#35202A</item>
+        <item name="colorOnSurfaceVariant">#D8C0C8</item>
+        <item name="android:colorBackground">#1D1014</item>
+    </style>
+
+    <style name="Theme.Prism.Violet" parent="Theme.Prism.Base">
+        <item name="colorPrimary">#D0BCFF</item>
+        <item name="colorOnPrimary">#381E72</item>
+        <item name="colorPrimaryContainer">#4F378B</item>
+        <item name="colorOnPrimaryContainer">#EADDFF</item>
+        <item name="colorSurface">#141218</item>
+        <item name="colorOnSurface">#E6E0E9</item>
+        <item name="colorSurfaceVariant">#2B2930</item>
+        <item name="colorOnSurfaceVariant">#CAC4D0</item>
+        <item name="android:colorBackground">#141218</item>
+    </style>
+
+    <style name="Theme.Prism.Amoled" parent="Theme.Prism.Base">
+        <item name="colorPrimary">#FFFFFF</item>
+        <item name="colorOnPrimary">#000000</item>
+        <item name="colorPrimaryContainer">#2A2A2A</item>
+        <item name="colorOnPrimaryContainer">#FFFFFF</item>
+        <item name="colorSurface">#000000</item>
+        <item name="colorOnSurface">#F2F2F2</item>
+        <item name="colorSurfaceVariant">#1A1A1A</item>
+        <item name="colorOnSurfaceVariant">#BDBDBD</item>
+        <item name="android:colorBackground">#000000</item>
     </style>
 </resources>

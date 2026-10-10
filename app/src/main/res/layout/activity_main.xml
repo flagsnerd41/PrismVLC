@@ -24,71 +24,68 @@
 
         <View
             android:layout_width="match_parent"
-            android:layout_height="120dp"
+            android:layout_height="110dp"
             android:layout_gravity="top"
             android:background="@drawable/scrim_top" />
 
         <View
             android:layout_width="match_parent"
-            android:layout_height="140dp"
+            android:layout_height="190dp"
             android:layout_gravity="bottom"
             android:background="@drawable/scrim_bottom" />
 
+        <!-- Top bar: back + title -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="top|end"
+            android:layout_gravity="top"
+            android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="16dp">
+            android:paddingHorizontal="8dp"
+            android:paddingTop="8dp">
 
-            <FrameLayout
-                android:layout_width="wrap_content"
-                android:layout_height="44dp"
-                android:layout_marginEnd="10dp">
+            <ImageButton
+                android:id="@+id/backBtn"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Back to library"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_chevron_down"
+                app:tint="@android:color/white" />
 
-                <ImageView
-                    android:id="@+id/blurSpeed"
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/titleText"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:contentDescription="@null"
-                    android:foreground="@color/glass_tint"
-                    android:maxWidth="1dp"
-                    android:maxHeight="1dp"
-                    android:scaleType="matrix" />
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textColor="@android:color/white"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/speedBtn"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:text="1x"
-                    android:textColor="@android:color/white" />
-            </FrameLayout>
-
-            <FrameLayout
-                android:layout_width="wrap_content"
-                android:layout_height="44dp">
-
-                <ImageView
-                    android:id="@+id/blurLib"
+                <TextView
+                    android:id="@+id/subtitleText"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:contentDescription="@null"
-                    android:foreground="@color/glass_tint"
-                    android:maxWidth="1dp"
-                    android:maxHeight="1dp"
-                    android:scaleType="matrix" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/libBtn"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:text="Library"
-                    android:textColor="@android:color/white" />
-            </FrameLayout>
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+            </LinearLayout>
         </LinearLayout>
 
+        <!-- Center: prev / play / next (heavy frosted glass) -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -101,7 +98,7 @@
                 android:layout_height="56dp">
 
                 <ImageView
-                    android:id="@+id/blurBack"
+                    android:id="@+id/blurPrev"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:contentDescription="@null"
@@ -111,21 +108,21 @@
                     android:scaleType="matrix" />
 
                 <ImageButton
-                    android:id="@+id/skipBack"
+                    android:id="@+id/prevBtn"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Back 10 seconds"
+                    android:contentDescription="Previous"
                     android:padding="15dp"
                     android:scaleType="centerInside"
-                    android:src="@drawable/ic_rewind"
+                    android:src="@drawable/ic_prev"
                     app:tint="@android:color/white" />
             </FrameLayout>
 
             <FrameLayout
-                android:layout_width="76dp"
-                android:layout_height="76dp"
-                android:layout_marginHorizontal="28dp">
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginHorizontal="36dp">
 
                 <ImageView
                     android:id="@+id/blurPlay"
@@ -143,7 +140,7 @@
                     android:layout_height="match_parent"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="Play or pause"
-                    android:padding="20dp"
+                    android:padding="22dp"
                     android:scaleType="centerInside"
                     android:src="@drawable/ic_play"
                     app:tint="@android:color/white" />
@@ -154,7 +151,7 @@
                 android:layout_height="56dp">
 
                 <ImageView
-                    android:id="@+id/blurFwd"
+                    android:id="@+id/blurNext"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:contentDescription="@null"
@@ -164,55 +161,237 @@
                     android:scaleType="matrix" />
 
                 <ImageButton
-                    android:id="@+id/skipFwd"
+                    android:id="@+id/nextBtn"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Forward 10 seconds"
+                    android:contentDescription="Next"
                     android:padding="15dp"
                     android:scaleType="centerInside"
-                    android:src="@drawable/ic_forward"
+                    android:src="@drawable/ic_next"
                     app:tint="@android:color/white" />
             </FrameLayout>
         </LinearLayout>
 
+        <!-- Bottom: seek bar + options pill + up next -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="20dp"
-            android:paddingBottom="20dp">
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="12dp">
 
-            <TextView
-                android:id="@+id/timeText"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="0:00"
-                android:textColor="@android:color/white"
-                android:textSize="12sp" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <com.google.android.material.slider.Slider
-                android:id="@+id/seekBar"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:valueFrom="0.0"
-                android:valueTo="1.0"
-                android:value="0.0"
-                app:labelBehavior="gone" />
+                <TextView
+                    android:id="@+id/timeText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0:00"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp" />
 
-            <TextView
-                android:id="@+id/durationText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0:00"
-                android:textColor="@android:color/white"
-                android:textSize="12sp" />
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/seekBar"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:value="0.0"
+                    android:valueFrom="0.0"
+                    android:valueTo="1.0"
+                    app:haloRadius="14dp"
+                    app:labelBehavior="gone"
+                    app:thumbRadius="6dp"
+                    app:trackColorInactive="#66FFFFFF"
+                    app:trackHeight="3dp" />
+
+                <TextView
+                    android:id="@+id/durationText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0:00"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp" />
+
+                <ImageButton
+                    android:id="@+id/rotateBtn"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Rotate screen"
+                    android:padding="10dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_fullscreen"
+                    app:tint="@android:color/white" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <FrameLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="52dp"
+                    android:layout_gravity="start">
+
+                    <ImageView
+                        android:id="@+id/blurPill"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@null"
+                        android:foreground="@color/glass_tint"
+                        android:maxWidth="1dp"
+                        android:maxHeight="1dp"
+                        android:scaleType="matrix" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="6dp">
+
+                        <ImageButton
+                            android:id="@+id/ccBtn"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="Subtitles"
+                            android:padding="12dp"
+                            android:scaleType="centerInside"
+                            android:src="@drawable/ic_subtitles"
+                            app:tint="@android:color/white" />
+
+                        <ImageButton
+                            android:id="@+id/audioBtn"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="Audio track"
+                            android:padding="12dp"
+                            android:scaleType="centerInside"
+                            android:src="@drawable/ic_audio"
+                            app:tint="@android:color/white" />
+
+                        <ImageButton
+                            android:id="@+id/castBtn"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="Cast"
+                            android:padding="12dp"
+                            android:scaleType="centerInside"
+                            android:src="@drawable/ic_cast"
+                            app:tint="@android:color/white" />
+
+                        <TextView
+                            android:id="@+id/speedBtn"
+                            android:layout_width="52dp"
+                            android:layout_height="48dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:text="1x"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </FrameLayout>
+
+                <FrameLayout
+                    android:id="@+id/nextPill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="52dp"
+                    android:layout_gravity="end"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/blurNextPill"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@null"
+                        android:foreground="@color/glass_tint"
+                        android:maxWidth="1dp"
+                        android:maxHeight="1dp"
+                        android:scaleType="matrix" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="18dp"
+                        android:paddingEnd="6dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Up next"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/nextThumb"
+                            android:layout_width="64dp"
+                            android:layout_height="38dp"
+                            android:layout_marginStart="10dp"
+                            android:background="@drawable/thumb_bg"
+                            android:clipToOutline="true"
+                            android:contentDescription="@null"
+                            android:scaleType="centerCrop" />
+                    </LinearLayout>
+                </FrameLayout>
+            </FrameLayout>
         </LinearLayout>
+
+        <!-- Options panel (subtitles / audio / speed / cast) -->
+        <FrameLayout
+            android:id="@+id/optionsPanel"
+            android:layout_width="250dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_marginStart="16dp"
+            android:layout_marginBottom="124dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/blurPanel"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:foreground="@color/glass_tint"
+                android:maxWidth="1dp"
+                android:maxHeight="1dp"
+                android:scaleType="matrix" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/optionsList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingVertical="8dp" />
+            </ScrollView>
+        </FrameLayout>
     </FrameLayout>
 
+    <!-- Library -->
     <LinearLayout
         android:id="@+id/libraryLayout"
         android:layout_width="match_parent"
@@ -222,13 +401,47 @@
         android:focusable="true"
         android:orientation="vertical">
 
-        <TextView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="20dp"
-            android:text="Videos"
-            android:textAppearance="?attr/textAppearanceHeadlineMedium"
-            android:textColor="?attr/colorOnSurface" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp">
+
+            <ImageButton
+                android:id="@+id/libBack"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Back"
+                android:padding="12dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_arrow_back"
+                android:visibility="gone"
+                app:tint="?attr/colorOnSurface" />
+
+            <TextView
+                android:id="@+id/libTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingStart="12dp"
+                android:text="Videos"
+                android:textAppearance="?attr/textAppearanceHeadlineMedium"
+                android:textColor="?attr/colorOnSurface" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/themeBtn"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Theme" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/emptyText"
