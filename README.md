@@ -1,4 +1,4 @@
-<img width="2400" height="1080" alt="2139" src="https://github.com/user-attachments/assets/eeb3fe3f-9db7-48de-8c6c-552219910405" /><div align="center">
+<div align="center">
 
 # ✨ PrismVLC
 
@@ -12,12 +12,14 @@
 
 ## 📸 Screenshots
 
-![Upload<img width="1080" height="2400" alt="2143" src="https://github.com/user-attachments/assets/44c108c4-0b67-4a1a-9ebb-c30652fc86e1" />
-<img width="2400" height="1080" alt="2142" src="https://github.com/user-attachments/assets/8de6e481-1976-47d3-8d20-8eb9475489d6" />
-<img width="2400" height="1080" alt="2141" src="https://github.com/user-attachments/assets/29a89c2e-9176-44a1-8707-43cf01d27586" />
-<img width="2400" height="1080" alt="2140" src="https://github.com/user-attachments/assets/c5f05611-22e6-44f1-b155-2f8ef3c0487b" />
-ing 2139.png…]()
-
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/44c108c4-0b67-4a1a-9ebb-c30652fc86e1" width="200">
+  <img src="https://github.com/user-attachments/assets/8de6e481-1976-47d3-8d20-8eb9475489d6" width="420">
+</p>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/29a89c2e-9176-44a1-8707-43cf01d27586" width="420">
+  <img src="https://github.com/user-attachments/assets/c5f05611-22e6-44f1-b155-2f8ef3c0487b" width="420">
+</p>
 
 ## ✨ Features
 
