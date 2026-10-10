@@ -22,20 +22,20 @@
         android:layout_height="match_parent"
         android:visibility="gone">
 
-        <View
+        <!-- Frosted blur at the bottom only (fades out upwards) -->
+        <com.example.myvlc.FadeImageView
+            android:id="@+id/blurBottom"
             android:layout_width="match_parent"
-            android:layout_height="110dp"
-            android:layout_gravity="top"
-            android:background="@drawable/scrim_top" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="190dp"
+            android:layout_height="260dp"
             android:layout_gravity="bottom"
-            android:background="@drawable/scrim_bottom" />
+            android:contentDescription="@null"
+            android:maxWidth="1dp"
+            android:maxHeight="1dp"
+            android:scaleType="matrix" />
 
         <!-- Top bar: back + title -->
         <LinearLayout
+            android:id="@+id/topBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="top"
@@ -65,6 +65,10 @@
 
                 <TextView
                     android:id="@+id/titleText"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="0"
+                    android:shadowDy="1"
+                    android:shadowRadius="6"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
@@ -75,6 +79,10 @@
 
                 <TextView
                     android:id="@+id/subtitleText"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="0"
+                    android:shadowDy="1"
+                    android:shadowRadius="6"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
@@ -175,6 +183,7 @@
 
         <!-- Bottom: seek bar + options pill + up next -->
         <LinearLayout
+            android:id="@+id/bottomBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"

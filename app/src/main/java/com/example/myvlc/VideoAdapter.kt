@@ -27,6 +27,16 @@ sealed class Row {
     data class VideoRow(val item: VideoItem) : Row()
 }
 
+/** Loads a video's cover; videos without one show the app icon on the icon's purple-blue. */
+fun loadCover(view: ImageView, uri: Uri) {
+    Glide.with(view).load(uri)
+        .placeholder(R.drawable.cover_placeholder)
+        .error(R.drawable.cover_placeholder)
+        .fallback(R.drawable.cover_placeholder)
+        .centerCrop()
+        .into(view)
+}
+
 fun formatTime(ms: Long): String {
     val s = ms / 1000
     val h = s / 3600
@@ -103,13 +113,12 @@ class LibraryAdapter(
                 h.title.text = row.name
                 h.duration.text = row.count.toString() + " videos"
                 val cover = row.cover
+                h.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
                 if (cover != null) {
-                    h.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
-                    Glide.with(h.thumb).load(cover).centerCrop().into(h.thumb)
+                    loadCover(h.thumb, cover)
                 } else {
                     Glide.with(h.thumb).clear(h.thumb)
-                    h.thumb.scaleType = ImageView.ScaleType.CENTER
-                    h.thumb.setImageResource(R.drawable.ic_playlist)
+                    h.thumb.setImageResource(R.drawable.cover_placeholder)
                 }
                 h.itemView.setOnClickListener { onPlaylist(row.name) }
                 h.itemView.setOnLongClickListener { onPlaylistLong(row.name); true }
@@ -119,7 +128,7 @@ class LibraryAdapter(
                 h.title.text = row.name
                 h.duration.text = row.count.toString() + " episodes"
                 h.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
-                Glide.with(h.thumb).load(row.cover).centerCrop().into(h.thumb)
+                loadCover(h.thumb, row.cover)
                 h.itemView.setOnClickListener { onSeries(row.name) }
                 h.itemView.setOnLongClickListener(null)
                 h.itemView.isLongClickable = false
@@ -132,7 +141,7 @@ class LibraryAdapter(
                     String.format("S%02dE%02d · %s", item.season, item.episode, formatTime(item.durationMs))
                 else formatTime(item.durationMs)
                 h.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
-                Glide.with(h.thumb).load(item.uri).centerCrop().into(h.thumb)
+                loadCover(h.thumb, item.uri)
                 h.itemView.setOnClickListener { onVideo(item) }
                 h.itemView.setOnLongClickListener { onVideoLong(item); true }
             }

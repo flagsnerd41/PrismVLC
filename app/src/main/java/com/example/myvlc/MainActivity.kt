@@ -153,8 +153,32 @@ class MainActivity : AppCompatActivity() {
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
         blurViews = listOf(
-            b.blurPrev, b.blurPlay, b.blurNext, b.blurPill, b.blurNextPill, b.blurPanel
+            b.blurPrev, b.blurPlay, b.blurNext, b.blurPill, b.blurNextPill, b.blurPanel,
+            b.blurBottom
         )
+
+        // Keep the title clear of the selfie camera / notch (and side cutouts in landscape)
+        val density = resources.displayMetrics.density
+        ViewCompat.setOnApplyWindowInsetsListener(b.controls) { _, insets ->
+            val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            val bars = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars())
+            val top = maxOf(cutout.top, bars.top)
+            val left = maxOf(cutout.left, bars.left)
+            val right = maxOf(cutout.right, bars.right)
+            b.topBar.setPadding(
+                maxOf((8 * density).toInt(), left),
+                top + (16 * density).toInt(),
+                maxOf((8 * density).toInt(), right),
+                0
+            )
+            b.bottomBar.setPadding(
+                maxOf((16 * density).toInt(), left),
+                0,
+                maxOf((16 * density).toInt(), right),
+                (12 * density).toInt()
+            )
+            insets
+        }
 
         libVLC = LibVLC(this, arrayListOf("--no-drop-late-frames", "--no-skip-frames"))
         player = MediaPlayer(libVLC)
@@ -605,7 +629,11 @@ class MainActivity : AppCompatActivity() {
         b.nextBtn.alpha = if (hasNext()) 1f else 0.45f
         if (hasNext()) {
             b.nextPill.visibility = View.VISIBLE
-            Glide.with(b.nextThumb).load(playlist[playIndex + 1].uri).centerCrop().into(b.nextThumb)
+            Glide.with(b.nextThumb).load(playlist[playIndex + 1].uri)
+                .placeholder(R.drawable.cover_placeholder)
+                .error(R.drawable.cover_placeholder)
+                .fallback(R.drawable.cover_placeholder)
+                .centerCrop().into(b.nextThumb)
         } else {
             b.nextPill.visibility = View.GONE
         }
@@ -616,17 +644,21 @@ class MainActivity : AppCompatActivity() {
     private fun setupUi() {
         // Heavy frosted glass behind every button: live blurred snapshot of the video
         for (v in blurViews) {
-            v.clipToOutline = true
-            v.outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    val r = if (view === b.blurPanel) 24f * view.resources.displayMetrics.density
-                    else minOf(view.width, view.height) / 2f
-                    outline.setRoundRect(0, 0, view.width, view.height, r)
+            val isBand = v === b.blurBottom
+            if (!isBand) {
+                v.clipToOutline = true
+                v.outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: Outline) {
+                        val r = if (view === b.blurPanel) 24f * view.resources.displayMetrics.density
+                        else minOf(view.width, view.height) / 2f
+                        outline.setRoundRect(0, 0, view.width, view.height, r)
+                    }
                 }
             }
             if (Build.VERSION.SDK_INT >= 31) {
+                val radius = if (isBand) 40f else 32f
                 v.setRenderEffect(
-                    RenderEffect.createBlurEffect(32f, 32f, Shader.TileMode.CLAMP)
+                    RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
                 )
             }
         }
@@ -964,6 +996,7 @@ class MainActivity : AppCompatActivity() {
         handler.removeCallbacks(hideRunnable)
         if (show) {
             b.controls.visibility = View.VISIBLE
+            ViewCompat.requestApplyInsets(b.controls)
             b.controls.animate().alpha(1f).setDuration(200).start()
             startBlur()
             scheduleHide()
