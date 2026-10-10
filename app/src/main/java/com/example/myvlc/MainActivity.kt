@@ -5,7 +5,7 @@ import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.graphics.Outline
 import android.graphics.RenderEffect
 import android.graphics.Shader
@@ -17,12 +17,14 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.provider.Settings
+import android.view.Choreographer
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -51,11 +53,28 @@ class MainActivity : AppCompatActivity() {
     private val hideRunnable = Runnable { setControlsVisible(false) }
     private var controlsVisible = false
     private var textureView: TextureView? = null
-    private val blurRunnable = object : Runnable {
-        override fun run() {
+    private lateinit var blurViews: List<ImageView>
+
+    // Redraw the frosted glass every display frame (slower while paused)
+    private val blurTick = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
             updateBlur()
-            if (controlsVisible && hasMedia) handler.postDelayed(this, 100)
+            if (controlsVisible && hasMedia) {
+                if (player.isPlaying) Choreographer.getInstance().postFrameCallback(this)
+                else handler.postDelayed(blurPost, 120)
+            }
         }
+    }
+    private val blurPost = Runnable { Choreographer.getInstance().postFrameCallback(blurTick) }
+
+    private fun startBlur() {
+        stopBlur()
+        Choreographer.getInstance().postFrameCallback(blurTick)
+    }
+
+    private fun stopBlur() {
+        Choreographer.getInstance().removeFrameCallback(blurTick)
+        handler.removeCallbacks(blurPost)
     }
 
     private var hasMedia = false
@@ -85,6 +104,7 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
+        blurViews = listOf(b.blurBack, b.blurPlay, b.blurFwd, b.blurSpeed, b.blurLib)
 
         libVLC = LibVLC(this, arrayListOf("--no-drop-late-frames", "--no-skip-frames"))
         player = MediaPlayer(libVLC)
@@ -179,6 +199,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showLibrary() {
         inLibrary = true
+        stopBlur()
         handler.removeCallbacksAndMessages(null)
         if (hasMedia) player.stop()
         hasMedia = false
@@ -212,17 +233,22 @@ class MainActivity : AppCompatActivity() {
     // ---------- UI ----------
 
     private fun setupUi() {
-        // Frosted glass: blurred snapshot of the video behind the play/pause button
-        b.blurBg.clipToOutline = true
-        b.blurBg.outlineProvider = object : ViewOutlineProvider() {
-            override fun getOutline(view: View, outline: Outline) {
-                outline.setOval(0, 0, view.width, view.height)
+        // Frosted glass behind every button: live blurred snapshot of the video
+        for (v in blurViews) {
+            v.clipToOutline = true
+            v.outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setRoundRect(
+                        0, 0, view.width, view.height,
+                        minOf(view.width, view.height) / 2f
+                    )
+                }
             }
-        }
-        if (Build.VERSION.SDK_INT >= 31) {
-            b.blurBg.setRenderEffect(
-                RenderEffect.createBlurEffect(20f, 20f, Shader.TileMode.CLAMP)
-            )
+            if (Build.VERSION.SDK_INT >= 31) {
+                v.setRenderEffect(
+                    RenderEffect.createBlurEffect(16f, 16f, Shader.TileMode.CLAMP)
+                )
+            }
         }
 
         b.libBtn.setOnClickListener { showLibrary() }
@@ -289,7 +315,10 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 if (inLibrary) return@runOnUiThread
                 when (e.type) {
-                    MediaPlayer.Event.Playing -> { setPlayIcon(true); scheduleHide() }
+                    MediaPlayer.Event.Playing -> {
+                        setPlayIcon(true); scheduleHide()
+                        if (controlsVisible) startBlur()
+                    }
                     MediaPlayer.Event.Paused -> { setPlayIcon(false); setControlsVisible(true) }
                     MediaPlayer.Event.Stopped, MediaPlayer.Event.EndReached -> {
                         setPlayIcon(false); setControlsVisible(true)
@@ -346,18 +375,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateBlur() {
         val tv = textureView ?: findTextureView(b.videoLayout)?.also { textureView = it } ?: return
-        val scale = 10
-        if (!tv.isAvailable || tv.width / scale < 2 || tv.height / scale < 2) return
-        val small = tv.getBitmap(tv.width / scale, tv.height / scale) ?: return
+        val scale = 12
+        val bw = tv.width / scale
+        val bh = tv.height / scale
+        if (!tv.isAvailable || bw < 2 || bh < 2) return
+        val bmp = tv.getBitmap(bw, bh) ?: return
+        val sx = tv.width.toFloat() / bw
+        val sy = tv.height.toFloat() / bh
         val tvLoc = IntArray(2)
-        val btnLoc = IntArray(2)
+        val loc = IntArray(2)
         tv.getLocationOnScreen(tvLoc)
-        b.blurBg.getLocationOnScreen(btnLoc)
-        val x = ((btnLoc[0] - tvLoc[0]) / scale).coerceIn(0, small.width - 2)
-        val y = ((btnLoc[1] - tvLoc[1]) / scale).coerceIn(0, small.height - 2)
-        val w = (b.blurBg.width / scale).coerceIn(1, small.width - x)
-        val h = (b.blurBg.height / scale).coerceIn(1, small.height - y)
-        b.blurBg.setImageBitmap(Bitmap.createBitmap(small, x, y, w, h))
+        val m = Matrix()
+        for (v in blurViews) {
+            v.getLocationOnScreen(loc)
+            m.setScale(sx, sy)
+            m.postTranslate((tvLoc[0] - loc[0]).toFloat(), (tvLoc[1] - loc[1]).toFloat())
+            v.setImageBitmap(bmp)
+            v.imageMatrix = m
+        }
     }
 
     private fun setControlsVisible(show: Boolean) {
@@ -366,11 +401,10 @@ class MainActivity : AppCompatActivity() {
         if (show) {
             b.controls.visibility = View.VISIBLE
             b.controls.animate().alpha(1f).setDuration(200).start()
-            handler.removeCallbacks(blurRunnable)
-            handler.post(blurRunnable)
+            startBlur()
             scheduleHide()
         } else {
-            handler.removeCallbacks(blurRunnable)
+            stopBlur()
             b.controls.animate().alpha(0f).setDuration(250).withEndAction {
                 if (!controlsVisible) b.controls.visibility = View.GONE
             }.start()
@@ -391,13 +425,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        handler.removeCallbacks(blurRunnable)
+        stopBlur()
         if (player.isPlaying) player.pause()
         player.detachViews()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        stopBlur()
         handler.removeCallbacksAndMessages(null)
         player.release()
         libVLC.release()
