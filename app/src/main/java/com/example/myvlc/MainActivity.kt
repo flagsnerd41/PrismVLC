@@ -56,7 +56,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var blurViews: List<ImageView>
 
     // Redraw the frosted glass every display frame (slower while paused)
-    private val blurTick = object : Choreographer.FrameCallback {
+    private val blurTick: Choreographer.FrameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             updateBlur()
             if (controlsVisible && hasMedia) {
@@ -65,7 +65,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    private val blurPost = Runnable { Choreographer.getInstance().postFrameCallback(blurTick) }
+    private val blurPost: Runnable = Runnable { Choreographer.getInstance().postFrameCallback(blurTick) }
 
     private fun startBlur() {
         stopBlur()
