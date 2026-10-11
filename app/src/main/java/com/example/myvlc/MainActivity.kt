@@ -9,6 +9,7 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.drawable.Animatable
 import android.graphics.Matrix
 import android.graphics.Outline
 import android.graphics.RenderEffect
@@ -23,6 +24,8 @@ import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.provider.Settings
 import android.text.TextUtils
+import android.transition.AutoTransition
+import android.transition.TransitionManager
 import android.view.Choreographer
 import android.view.GestureDetector
 import android.view.Gravity
@@ -31,6 +34,8 @@ import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
+import android.view.WindowManager
+import android.view.animation.OvershootInterpolator
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -39,6 +44,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -111,6 +117,8 @@ class MainActivity : AppCompatActivity() {
     private var currentPlaylist: String? = null
     private lateinit var grid: GridLayoutManager
     private var tab = 0
+    private var lastPlaying = false
+    private var pendingDelete: List<VideoItem> = emptyList()
     private var query = ""
     private var searchVisible = false
     private lateinit var store: PlaylistStore
@@ -136,6 +144,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    private val deleteLauncher =
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                for (item in pendingDelete) {
+                    for (name in store.names()) store.remove(name, item.uri.toString())
+                }
+                pendingDelete = emptyList()
+                toast("Deleted")
+                loadVideos()
+            }
+        }
+
     private val subtitlePicker =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             uri?.let { addSubtitle(it) }
@@ -157,6 +177,9 @@ class MainActivity : AppCompatActivity() {
         if (themeIndex == 0) DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        val wlp = window.attributes
+        wlp.rotationAnimation = WindowManager.LayoutParams.ROTATION_ANIMATION_CROSSFADE
+        window.attributes = wlp
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
         blurViews = listOf(
@@ -321,6 +344,7 @@ class MainActivity : AppCompatActivity() {
                 if (currentPlaylist != null && !store.names().contains(currentPlaylist)) currentPlaylist = null
                 applyLibraryHeader()
                 rebuildRows()
+                b.videoList.scheduleLayoutAnimation()
                 if (list.isEmpty()) showEmpty(false)
             }
         }.start()
@@ -413,10 +437,21 @@ class MainActivity : AppCompatActivity() {
         return (widthDp / 170f).toInt().coerceIn(2, 6)
     }
 
-    private fun refreshLibrary() {
+    /** direction: 1 = slide in from the right (open), -1 = from the left (back), 0 = just pop in. */
+    private fun refreshLibrary(direction: Int = 0) {
         applyLibraryHeader()
         rebuildRows()
         b.videoList.scrollToPosition(0)
+        b.videoList.scheduleLayoutAnimation()
+        if (direction != 0) {
+            val density = resources.displayMetrics.density
+            b.videoList.animate().cancel()
+            b.videoList.translationX = direction * 48f * density
+            b.videoList.alpha = 0f
+            b.videoList.animate().translationX(0f).alpha(1f).setDuration(260).start()
+            b.libTitle.alpha = 0f
+            b.libTitle.animate().alpha(1f).setDuration(260).start()
+        }
     }
 
     private fun refreshKeepScroll() {
@@ -427,19 +462,19 @@ class MainActivity : AppCompatActivity() {
     private fun openSeries(name: String?) {
         currentSeries = name
         currentPlaylist = null
-        refreshLibrary()
+        refreshLibrary(if (name != null) 1 else -1)
     }
 
     private fun openPlaylist(name: String?) {
         currentPlaylist = name
         currentSeries = null
-        refreshLibrary()
+        refreshLibrary(if (name != null) 1 else -1)
     }
 
     private fun libraryUp() {
         currentSeries = null
         currentPlaylist = null
-        refreshLibrary()
+        refreshLibrary(-1)
     }
 
     private fun onVideoClicked(item: VideoItem) {
@@ -545,19 +580,45 @@ class MainActivity : AppCompatActivity() {
 
     private fun showVideoMenu(item: VideoItem) {
         val cp = currentPlaylist
-        val options = if (cp != null) arrayOf("Remove from this playlist", "Add to another playlist")
-        else arrayOf("Add to playlist")
+        val options = if (cp != null)
+            arrayOf("Remove from this playlist", "Add to another playlist", "Delete video")
+        else arrayOf("Add to playlist", "Delete video")
         MaterialAlertDialogBuilder(this)
             .setTitle(item.title)
             .setItems(options) { _, which ->
-                if (cp != null && which == 0) {
-                    store.remove(cp, item.uri.toString())
-                    refreshKeepScroll()
-                } else {
-                    showAddToPlaylist(item)
+                when (options[which]) {
+                    "Remove from this playlist" -> {
+                        if (cp != null) store.remove(cp, item.uri.toString())
+                        refreshKeepScroll()
+                    }
+                    "Delete video" -> confirmDelete(item)
+                    else -> showAddToPlaylist(item)
                 }
             }
             .show()
+    }
+
+    private fun confirmDelete(item: VideoItem) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Delete this video?")
+            .setMessage("\"" + item.title + "\" will be permanently removed from your phone.")
+            .setPositiveButton("Delete") { _, _ -> requestDelete(listOf(item)) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun requestDelete(items: List<VideoItem>) {
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                pendingDelete = items
+                val pi = MediaStore.createDeleteRequest(contentResolver, items.map { it.uri })
+                deleteLauncher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
+            } catch (e: Exception) {
+                toast("Can't delete this video")
+            }
+        } else {
+            toast("Deleting videos needs Android 11 or newer")
+        }
     }
 
     private fun showPlaylistMenu(name: String) {
@@ -601,7 +662,9 @@ class MainActivity : AppCompatActivity() {
         hasMedia = false
         controlsVisible = false
         b.controls.visibility = View.GONE
-        b.libraryLayout.visibility = View.VISIBLE
+        showLibraryAnimated()
+        lastPlaying = false
+        b.playPause.setImageResource(R.drawable.ic_play)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         applyLibraryHeader()
 
@@ -614,11 +677,31 @@ class MainActivity : AppCompatActivity() {
         ensureLibrary()
     }
 
+    private fun showLibraryAnimated() {
+        b.libraryLayout.animate().cancel()
+        b.libraryLayout.alpha = 0f
+        b.libraryLayout.scaleX = 0.96f
+        b.libraryLayout.scaleY = 0.96f
+        b.libraryLayout.visibility = View.VISIBLE
+        b.libraryLayout.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(260).start()
+    }
+
+    private fun hideLibraryAnimated() {
+        b.libraryLayout.animate().cancel()
+        b.libraryLayout.animate().alpha(0f).scaleX(1.04f).scaleY(1.04f).setDuration(240)
+            .withEndAction {
+                if (!inLibrary) b.libraryLayout.visibility = View.GONE
+                b.libraryLayout.alpha = 1f
+                b.libraryLayout.scaleX = 1f
+                b.libraryLayout.scaleY = 1f
+            }.start()
+    }
+
     private fun showPlayer() {
         inLibrary = false
         hasMedia = true
         backCallback.isEnabled = true
-        b.libraryLayout.visibility = View.GONE
+        hideLibraryAnimated()
         WindowInsetsControllerCompat(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             hide(WindowInsetsCompat.Type.systemBars())
@@ -760,8 +843,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         b.backBtn.setOnClickListener { showLibrary() }
-        b.prevBtn.setOnClickListener { playPrev() }
-        b.nextBtn.setOnClickListener { playNext() }
+        b.prevBtn.setOnClickListener { nudge(b.prevBtn, -1); playPrev() }
+        b.nextBtn.setOnClickListener { nudge(b.nextBtn, 1); playNext() }
         b.nextPill.setOnClickListener { playNext() }
         b.ccBtn.setOnClickListener { showSubtitlePanel() }
         b.audioBtn.setOnClickListener { showAudioPanel() }
@@ -866,7 +949,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setPlayIcon(playing: Boolean) {
-        b.playPause.setImageResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play)
+        if (lastPlaying == playing) return
+        lastPlaying = playing
+        // the play and pause shapes morph into each other
+        b.playPause.setImageResource(
+            if (playing) R.drawable.avd_play_to_pause else R.drawable.avd_pause_to_play
+        )
+        (b.playPause.drawable as? Animatable)?.start()
+    }
+
+    private fun nudge(v: View, direction: Int) {
+        val dist = 8f * resources.displayMetrics.density * direction
+        v.animate().translationX(dist).setDuration(90).withEndAction {
+            v.animate().translationX(0f).setDuration(220)
+                .setInterpolator(OvershootInterpolator()).start()
+        }.start()
     }
 
     private fun toggleOrientation() {
@@ -1102,6 +1199,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
+        // animate the layout moving to its new orientation
+        val t1 = AutoTransition()
+        t1.duration = 300
+        TransitionManager.beginDelayedTransition(b.libraryLayout, t1)
+        val t2 = AutoTransition()
+        t2.duration = 300
+        TransitionManager.beginDelayedTransition(b.controls, t2)
         super.onConfigurationChanged(newConfig)
         grid.spanCount = computeSpan()
     }

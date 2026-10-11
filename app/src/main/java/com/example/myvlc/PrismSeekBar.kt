@@ -4,10 +4,9 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.util.TypedValue
@@ -16,8 +15,8 @@ import android.view.View
 import androidx.core.graphics.ColorUtils
 
 /**
- * A progress bar that grows while you touch it, shows a glowing thumb
- * and a floating time bubble that follows your finger.
+ * Chunky rounded progress bar: a filled track, a gap, a slim vertical handle,
+ * a gap, then the rest of the track with a dot at the end. Shows a time bubble while dragging.
  */
 class PrismSeekBar @JvmOverloads constructor(
     context: Context,
@@ -36,13 +35,9 @@ class PrismSeekBar @JvmOverloads constructor(
     private var expand = 0f
     private var animator: ValueAnimator? = null
 
-    private val accent: Int
-    private val accentLight: Int
-    private val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x59FFFFFF }
     private val activePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val thumbPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val thumbPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xCC000000.toInt() }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
@@ -50,14 +45,20 @@ class PrismSeekBar @JvmOverloads constructor(
         typeface = Typeface.DEFAULT_BOLD
     }
     private val rect = RectF()
+    private val path = Path()
 
     init {
-        val tv = TypedValue()
-        accent = if (context.theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, tv, true))
-            tv.data else 0xFF7C9CFF.toInt()
-        accentLight = ColorUtils.blendARGB(accent, Color.WHITE, 0.45f)
-        ringPaint.color = accent
+        val accent = themeColor(androidx.appcompat.R.attr.colorPrimary, 0xFF8AB4FF.toInt())
+        val container = themeColor(com.google.android.material.R.attr.colorPrimaryContainer, 0xFF0F3F9F.toInt())
+        activePaint.color = accent
+        thumbPaint.color = accent
+        inactivePaint.color = ColorUtils.setAlphaComponent(container, 235)
         textPaint.textSize = 13f * d
+    }
+
+    private fun themeColor(attr: Int, fallback: Int): Int {
+        val tv = TypedValue()
+        return if (context.theme.resolveAttribute(attr, tv, true)) tv.data else fallback
     }
 
     /** Called by the player to move the bar (ignored while you are dragging). */
@@ -81,7 +82,7 @@ class PrismSeekBar @JvmOverloads constructor(
     }
 
     private fun fraction(x: Float): Float {
-        val pad = 12f * d
+        val pad = 14f * d
         val w = width - 2 * pad
         return if (w <= 0f) 0f else ((x - pad) / w).coerceIn(0f, 1f)
     }
@@ -121,41 +122,59 @@ class PrismSeekBar @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        val pad = 12f * d
+        val pad = 14f * d
         val left = pad
         val right = width - pad
-        val cy = height - 18f * d
-        val h = (4f + 6f * expand) * d
-
-        rect.set(left, cy - h / 2, right, cy + h / 2)
-        canvas.drawRoundRect(rect, h / 2, h / 2, inactivePaint)
-
+        val cy = height - 26f * d
+        val h = 16f * d
+        val outer = h / 2
+        val inner = 3f * d
+        val thumbW = (5f - 2f * expand) * d
+        val thumbH = (40f + 4f * expand) * d
+        val gap = 6f * d
         val x = left + (right - left) * shown
-        if (x > left) {
-            activePaint.shader = LinearGradient(
-                left, 0f, maxOf(x, left + 1f), 0f, accent, accentLight, Shader.TileMode.CLAMP
+
+        val activeEnd = x - thumbW / 2 - gap
+        val inactiveStart = x + thumbW / 2 + gap
+
+        // filled part (round on the left, soft corners next to the handle)
+        if (activeEnd > left + 1f) {
+            rect.set(left, cy - h / 2, activeEnd, cy + h / 2)
+            path.reset()
+            path.addRoundRect(
+                rect,
+                floatArrayOf(outer, outer, inner, inner, inner, inner, outer, outer),
+                Path.Direction.CW
             )
-            rect.set(left, cy - h / 2, x, cy + h / 2)
-            canvas.drawRoundRect(rect, h / 2, h / 2, activePaint)
+            canvas.drawPath(path, activePaint)
         }
 
-        if (expand > 0f) {
-            glowPaint.color = ColorUtils.setAlphaComponent(accent, (70 * expand).toInt())
-            canvas.drawCircle(x, cy, 20f * d * (0.6f + 0.4f * expand), glowPaint)
-        }
-        val tr = (6f + 5f * expand) * d
-        canvas.drawCircle(x, cy, tr, thumbPaint)
-        if (expand > 0f) {
-            ringPaint.strokeWidth = 2.5f * d * expand
-            canvas.drawCircle(x, cy, tr, ringPaint)
+        // remaining part (soft corners next to the handle, round on the right) + end dot
+        if (right > inactiveStart + 1f) {
+            rect.set(inactiveStart, cy - h / 2, right, cy + h / 2)
+            path.reset()
+            path.addRoundRect(
+                rect,
+                floatArrayOf(inner, inner, outer, outer, outer, outer, inner, inner),
+                Path.Direction.CW
+            )
+            canvas.drawPath(path, inactivePaint)
+            if (right - inactiveStart > h) {
+                canvas.drawCircle(right - outer, cy, 3f * d, thumbPaint)
+            }
         }
 
+        // handle
+        rect.set(x - thumbW / 2, cy - thumbH / 2, x + thumbW / 2, cy + thumbH / 2)
+        canvas.drawRoundRect(rect, thumbW / 2, thumbW / 2, thumbPaint)
+
+        // time bubble while dragging
         if (expand > 0.05f) {
             val label = formatTime((shown * durationMs).toLong())
             val tw = textPaint.measureText(label) + 24f * d
             val bh = 28f * d
             val bx = x.coerceIn(tw / 2, width - tw / 2)
-            val bottom = cy - tr - 8f * d
+            val bottom = cy - thumbH / 2 - 6f * d
             bubblePaint.alpha = (204 * expand).toInt()
             textPaint.alpha = (255 * expand).toInt()
             rect.set(bx - tw / 2, bottom - bh, bx + tw / 2, bottom)

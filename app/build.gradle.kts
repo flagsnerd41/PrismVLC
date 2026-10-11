@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.myvlc"
         minSdk = 24
         targetSdk = 34
-        versionCode = 8
-        versionName = "8.0"
+        versionCode = 9
+        versionName = "9.0"
         // arm64 only = much smaller APK (fits modern phones)
         ndk { abiFilters += listOf("arm64-v8a") }
     }
