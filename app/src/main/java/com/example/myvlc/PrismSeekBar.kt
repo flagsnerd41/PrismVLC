@@ -61,6 +61,12 @@ class PrismSeekBar @JvmOverloads constructor(
         return if (context.theme.resolveAttribute(attr, tv, true)) tv.data else fallback
     }
 
+    /** Horizontal centre of the handle, in this view's own coordinates. */
+    fun thumbCenterX(): Float {
+        val pad = 14f * d
+        return pad + (width - 2 * pad) * shown
+    }
+
     /** Called by the player to move the bar (ignored while you are dragging). */
     fun updateProgress(p: Float) {
         if (!dragging) {

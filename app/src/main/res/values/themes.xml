@@ -97,4 +97,11 @@
         <item name="colorSecondaryContainer">#2A2A2A</item>
         <item name="colorOnSecondaryContainer">#FFFFFF</item>
     </style>
+
+    <!-- Launch (splash) screen with the Prism logo -->
+    <style name="Theme.Prism.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#2B3FD4</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.MyVLC</item>
+    </style>
 </resources>

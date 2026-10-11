@@ -8,6 +8,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.google.android.material.progressindicator.LinearProgressIndicator
 
 data class VideoItem(
     val uri: Uri,
@@ -15,7 +16,12 @@ data class VideoItem(
     val durationMs: Long,
     val series: String? = null,
     val season: Int = 0,
-    val episode: Int = 0
+    val episode: Int = 0,
+    val size: Long = 0L,
+    val width: Int = 0,
+    val height: Int = 0,
+    val folder: String = "",
+    val added: Long = 0L
 )
 
 sealed class Row {
@@ -25,7 +31,8 @@ sealed class Row {
     object AddVideos : Row()
     data class PlaylistRow(val name: String, val count: Int, val cover: Uri?) : Row()
     data class SeriesRow(val name: String, val count: Int, val cover: Uri) : Row()
-    data class VideoRow(val item: VideoItem) : Row()
+    data class FolderRow(val name: String, val count: Int, val cover: Uri) : Row()
+    data class VideoRow(val item: VideoItem, val progress: Float = 0f) : Row()
 }
 
 /** Loads a video's cover; videos without one show the app icon on the icon's purple-blue. */
@@ -46,8 +53,14 @@ fun formatTime(ms: Long): String {
     return if (h > 0) String.format("%d:%02d:%02d", h, m, sec) else String.format("%d:%02d", m, sec)
 }
 
+fun formatSize(bytes: Long): String {
+    val mb = bytes / (1024.0 * 1024.0)
+    return if (mb >= 1024.0) String.format("%.2f GB", mb / 1024.0) else String.format("%.1f MB", mb)
+}
+
 class LibraryAdapter(
     private val onSeries: (String) -> Unit,
+    private val onFolder: (String) -> Unit,
     private val onVideo: (VideoItem) -> Unit,
     private val onVideoLong: (VideoItem) -> Unit,
     private val onPlaylist: (String) -> Unit,
@@ -73,7 +86,7 @@ class LibraryAdapter(
         notifyDataSetChanged()
     }
 
-    /** Headers, notes and action rows span the full width; video cards take half. */
+    /** Headers, notes and action rows span the full width; video cards take one column. */
     fun isFullSpan(position: Int): Boolean = getItemViewType(position) != T_CARD
 
     class HeaderVH(v: View) : RecyclerView.ViewHolder(v) {
@@ -93,6 +106,7 @@ class LibraryAdapter(
         val title: TextView = v.findViewById(R.id.title)
         val duration: TextView = v.findViewById(R.id.duration)
         val badge: TextView? = v.findViewById(R.id.badge)
+        val progress: LinearProgressIndicator? = v.findViewById(R.id.progressBar)
     }
 
     override fun getItemCount(): Int = rows.size
@@ -101,7 +115,8 @@ class LibraryAdapter(
         is Row.Header -> T_HEADER
         is Row.Note -> T_NOTE
         is Row.NewPlaylist, is Row.AddVideos -> T_ACTION
-        is Row.PlaylistRow, is Row.SeriesRow, is Row.VideoRow -> if (listMode) T_LIST else T_CARD
+        is Row.PlaylistRow, is Row.SeriesRow, is Row.FolderRow, is Row.VideoRow ->
+            if (listMode) T_LIST else T_CARD
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
@@ -112,6 +127,25 @@ class LibraryAdapter(
             T_ACTION -> ActionVH(inflater.inflate(R.layout.item_action, parent, false))
             T_CARD -> ItemVH(inflater.inflate(R.layout.item_card, parent, false))
             else -> ItemVH(inflater.inflate(R.layout.item_video, parent, false))
+        }
+    }
+
+    /** Small "press" animation, then run the action. */
+    private fun press(v: View, action: () -> Unit) {
+        v.animate().cancel()
+        v.animate().scaleX(0.96f).scaleY(0.96f).setDuration(70).withEndAction {
+            v.animate().scaleX(1f).scaleY(1f).setDuration(110).start()
+            action()
+        }.start()
+    }
+
+    private fun bindProgress(h: ItemVH, fraction: Float) {
+        val bar = h.progress ?: return
+        if (fraction > 0f) {
+            bar.visibility = View.VISIBLE
+            bar.setProgressCompat((fraction * 100).toInt(), false)
+        } else {
+            bar.visibility = View.GONE
         }
     }
 
@@ -138,6 +172,7 @@ class LibraryAdapter(
                 h.title.text = row.name
                 h.duration.text = row.count.toString() + " videos"
                 h.badge?.visibility = View.GONE
+                bindProgress(h, 0f)
                 val cover = row.cover
                 h.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
                 if (cover != null) {
@@ -146,7 +181,7 @@ class LibraryAdapter(
                     Glide.with(h.thumb).clear(h.thumb)
                     h.thumb.setImageResource(R.drawable.cover_placeholder)
                 }
-                h.itemView.setOnClickListener { onPlaylist(row.name) }
+                h.itemView.setOnClickListener { press(h.itemView) { onPlaylist(row.name) } }
                 h.itemView.setOnLongClickListener { onPlaylistLong(row.name); true }
             }
             is Row.SeriesRow -> {
@@ -154,9 +189,22 @@ class LibraryAdapter(
                 h.title.text = row.name
                 h.duration.text = row.count.toString() + " episodes"
                 h.badge?.visibility = View.GONE
+                bindProgress(h, 0f)
                 h.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
                 loadCover(h.thumb, row.cover)
-                h.itemView.setOnClickListener { onSeries(row.name) }
+                h.itemView.setOnClickListener { press(h.itemView) { onSeries(row.name) } }
+                h.itemView.setOnLongClickListener(null)
+                h.itemView.isLongClickable = false
+            }
+            is Row.FolderRow -> {
+                val h = holder as ItemVH
+                h.title.text = row.name
+                h.duration.text = row.count.toString() + " videos"
+                h.badge?.visibility = View.GONE
+                bindProgress(h, 0f)
+                h.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
+                loadCover(h.thumb, row.cover)
+                h.itemView.setOnClickListener { press(h.itemView) { onFolder(row.name) } }
                 h.itemView.setOnLongClickListener(null)
                 h.itemView.isLongClickable = false
             }
@@ -176,9 +224,10 @@ class LibraryAdapter(
                     h.badge?.visibility = View.VISIBLE
                     h.badge?.text = formatTime(item.durationMs)
                 }
+                bindProgress(h, row.progress)
                 h.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
                 loadCover(h.thumb, item.uri)
-                h.itemView.setOnClickListener { onVideo(item) }
+                h.itemView.setOnClickListener { press(h.itemView) { onVideo(item) } }
                 h.itemView.setOnLongClickListener { onVideoLong(item); true }
             }
         }

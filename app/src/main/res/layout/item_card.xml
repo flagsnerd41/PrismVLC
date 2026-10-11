@@ -34,13 +34,25 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|end"
-                android:layout_margin="8dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginBottom="10dp"
                 android:background="@drawable/badge_bg"
                 android:paddingHorizontal="7dp"
                 android:paddingVertical="3dp"
                 android:textColor="@android:color/white"
                 android:textSize="11sp"
                 android:textStyle="bold" />
+
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/progressBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:visibility="gone"
+                app:trackColor="#66000000"
+                app:trackThickness="4dp" />
         </FrameLayout>
 
         <TextView
