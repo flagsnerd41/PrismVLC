@@ -1191,7 +1191,7 @@ class MainActivity : AppCompatActivity() {
     // ---------- UI wiring ----------
 
     private fun setupUi() {
-        // Heavy frosted glass behind every button: live blurred snapshot of the video
+        // Live video snapshot under every control; real liquid glass on Android 13+
         for (v in blurViews) {
             val isBand = v === b.blurBottom
             if (!isBand) {
@@ -1204,12 +1204,31 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
-            if (Build.VERSION.SDK_INT >= 31) {
+            if (Build.VERSION.SDK_INT >= 33) {
+                val strength = when {
+                    isBand -> 0.08f
+                    v === b.blurPanel -> 0.10f
+                    else -> 0.28f
+                }
+                val corner = when {
+                    isBand -> null
+                    v === b.blurPanel -> 24f
+                    v === b.blurPill || v === b.blurNextPill -> 200f
+                    else -> null
+                }
+                LiquidGlass.attach(v, cornerDp = corner, strength = strength)
+            } else if (Build.VERSION.SDK_INT >= 31) {
                 val radius = if (isBand) 40f else 32f
                 v.setRenderEffect(
                     RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
                 )
             }
+        }
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            LiquidGlass.swell(b.playPause, b.blurPlay)
+            LiquidGlass.swell(b.prevBtn, b.blurPrev)
+            LiquidGlass.swell(b.nextBtn, b.blurNext)
         }
 
         // library
