@@ -109,7 +109,9 @@ float3 scene(float2 c) {
         dispersion: Float,
         dens: Float,
         press: Float,
-        bounded: Boolean
+        bounded: Boolean,
+        tintRgb: Float = 0f,
+        tintA: Float = 0.16f
     ) {
         s.setFloatUniform("size", w, h)
         s.setFloatUniform("origin", ox, oy)
@@ -127,7 +129,7 @@ float3 scene(float2 c) {
         s.setFloatUniform("dispersion", dispersion)
         s.setFloatUniform("dens", dens)
         s.setFloatUniform("press", press)
-        s.setFloatUniform("tint", 1f, 1f, 1f, 0.05f)
+        s.setFloatUniform("tint", tintRgb, tintRgb, tintRgb, tintA)
     }
 
     /**
