@@ -8,11 +8,11 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.myvlc"
+        applicationId = "com.flagsnerd.PrismTume"
         minSdk = 24
         targetSdk = 34
-        versionCode = 10
-        versionName = "10.0"
+        versionCode = 11
+        versionName = "11.0"
         // arm64 only = much smaller APK (fits modern phones)
         ndk { abiFilters += listOf("arm64-v8a") }
     }
@@ -34,4 +34,5 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     implementation("com.github.bumptech.glide:glide:4.16.0")
     implementation("org.videolan.android:libvlc-all:3.6.0")
+    implementation("androidx.dynamicanimation:dynamicanimation:1.0.0")
 }

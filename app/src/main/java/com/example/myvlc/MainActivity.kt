@@ -137,6 +137,7 @@ class MainActivity : AppCompatActivity() {
     private var lastPlaying = false
     private var lastSave = 0L
     private var switchingUntil = 0L
+    private var settingsOpen = false
 
     // library data
     private var allVideos: List<VideoItem> = emptyList()
@@ -244,6 +245,7 @@ class MainActivity : AppCompatActivity() {
         if (themeIndex == 0) DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
         density = resources.displayMetrics.density
+        GlassSettings.init(prefs)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val wlp = window.attributes
         wlp.rotationAnimation = WindowManager.LayoutParams.ROTATION_ANIMATION_CROSSFADE
@@ -300,7 +302,11 @@ class MainActivity : AppCompatActivity() {
                     showAddVideosDialog(name)
                 }
             },
-            onAddVideos = { currentPlaylist?.let { showAddVideosDialog(it) } }
+            onAddVideos = { currentPlaylist?.let { showAddVideosDialog(it) } },
+            onHeroRestart = { item ->
+                progress.remove(item.uri.toString())
+                onVideoClicked(item)
+            }
         )
         grid = GridLayoutManager(this, computeSpan())
         grid.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
@@ -527,8 +533,11 @@ class MainActivity : AppCompatActivity() {
             } else {
                 val cont = continueWatching()
                 if (cont.isNotEmpty()) {
-                    rows.add(Row.Header("Continue watching"))
-                    cont.forEach { rows.add(Row.VideoRow(it.first, it.second)) }
+                    rows.add(Row.Hero(cont[0].first, cont[0].second))
+                    if (cont.size > 1) {
+                        rows.add(Row.Header("Continue watching"))
+                        cont.drop(1).forEach { rows.add(Row.VideoRow(it.first, it.second)) }
+                    }
                 }
                 if (allVideos.size > 8) {
                     rows.add(Row.Header("Recently added"))
@@ -866,6 +875,7 @@ class MainActivity : AppCompatActivity() {
             if (listLayout) "Switch to grid view" else "Switch to list view",
             "Card size: " + sizeNames[cardSize],
             "Sort by: " + sortNames[sortMode],
+            "Glass & blur settings",
             "About Prism"
         )
         MaterialAlertDialogBuilder(this)
@@ -896,6 +906,7 @@ class MainActivity : AppCompatActivity() {
                             refreshKeepScroll()
                         }
                         .show()
+                    4 -> showGlassSettings()
                     else -> MaterialAlertDialogBuilder(this)
                         .setTitle("Prism")
                         .setMessage(
@@ -1212,12 +1223,14 @@ class MainActivity : AppCompatActivity() {
                 val panel = v === b.blurPanel
                 LiquidGlass.attach(v, if (panel) 24f else null, if (panel) 0.06f else 0.28f)
             } else if (Build.VERSION.SDK_INT >= 31) {
-                val radius = if (isBand) 40f else 32f
+                val radius = if (isBand) maxOf(GlassSettings.bandBlur, 0.5f) else 32f
                 v.setRenderEffect(
                     RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
                 )
             }
         }
+
+        applyGlassSettings()
 
         // library
         b.menuBtn.setOnClickListener { showMenuDialog() }
@@ -1605,7 +1618,7 @@ class MainActivity : AppCompatActivity() {
     private fun showMorePanel() {
         val labels = arrayListOf(
             "Aspect ratio", "Sleep timer", "A-B repeat", "Equalizer",
-            "Picture-in-picture", "Lock screen", "Video info", "Share"
+            "Picture-in-picture", "Lock screen", "Video info", "Glass & blur settings", "Share"
         )
         showPanel(labels, -1) { i ->
             when (i) {
@@ -1619,6 +1632,7 @@ class MainActivity : AppCompatActivity() {
                     val item = currentItem()
                     if (item != null) showInfo(item) else toast("No info for this video")
                 }
+                7 -> showGlassSettings()
                 else -> {
                     val item = currentItem()
                     if (item != null) shareVideo(item) else toast("Nothing to share")
@@ -1783,6 +1797,109 @@ class MainActivity : AppCompatActivity() {
         b.previewCard.translationY = (sb[1] - ct[1]) - cardH - 4f * density
     }
 
+    // ---------- Glass & blur settings ----------
+
+    private fun applyGlassSettings() {
+        val lp = b.blurBottom.layoutParams
+        val h = (GlassSettings.bandHeightDp * density).toInt().coerceAtLeast(1)
+        if (lp.height != h) {
+            lp.height = h
+            b.blurBottom.layoutParams = lp
+        }
+        b.blurBottom.visibility = if (GlassSettings.bandHeightDp < 8f) View.INVISIBLE else View.VISIBLE
+        if (Build.VERSION.SDK_INT >= 31) {
+            val r = maxOf(GlassSettings.bandBlur, 0.5f)
+            b.blurBottom.setRenderEffect(RenderEffect.createBlurEffect(r, r, Shader.TileMode.CLAMP))
+        }
+        if (Build.VERSION.SDK_INT >= 33) LiquidGlass.refreshAll()
+        b.seekBar.invalidate()
+    }
+
+    private fun showGlassSettings() {
+        val pad = (20 * density).toInt()
+        val onSurface = themeColor(com.google.android.material.R.attr.colorOnSurface, Color.WHITE)
+        val col = LinearLayout(this)
+        col.orientation = LinearLayout.VERTICAL
+        col.setPadding(pad, (4 * density).toInt(), pad, (8 * density).toInt())
+
+        val hint = TextView(this)
+        hint.text = if (inLibrary) "Open a video to watch the glass change live."
+        else "Changes apply live behind this window."
+        hint.setTextColor(themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant, Color.GRAY))
+        hint.textSize = 13f
+        col.addView(hint)
+
+        val sw = com.google.android.material.materialswitch.MaterialSwitch(this)
+        sw.text = "Liquid glass (Android 13+)"
+        sw.isChecked = GlassSettings.liquid
+        sw.setOnCheckedChangeListener { _, checked ->
+            GlassSettings.liquid = checked
+            GlassSettings.save()
+            applyGlassSettings()
+        }
+        col.addView(sw)
+
+        fun slider(label: String, from: Float, to: Float, value: Float, unit: String, set: (Float) -> Unit) {
+            val tv = TextView(this)
+            tv.text = label + ": " + String.format("%.2f", value) + unit
+            tv.setTextColor(onSurface)
+            tv.textSize = 14f
+            tv.setPadding(0, (12 * density).toInt(), 0, 0)
+            val s = com.google.android.material.slider.Slider(this)
+            s.valueFrom = from
+            s.valueTo = to
+            s.value = value.coerceIn(from, to)
+            s.addOnChangeListener { _, v, _ ->
+                tv.text = label + ": " + String.format("%.2f", v) + unit
+                set(v)
+                GlassSettings.save()
+                applyGlassSettings()
+            }
+            col.addView(tv)
+            col.addView(s)
+        }
+
+        slider("Glass blur", 0f, 25f, GlassSettings.blur, " px") { GlassSettings.blur = it }
+        slider("Refraction strength", 0f, 2f, GlassSettings.refraction, "x") { GlassSettings.refraction = it }
+        slider("Glass darkness", 0f, 0.5f, GlassSettings.tint, "") { GlassSettings.tint = it }
+        slider("Colour split", 0f, 0.2f, GlassSettings.dispersion, "") { GlassSettings.dispersion = it }
+        slider("Bottom blur height", 0f, 180f, GlassSettings.bandHeightDp, " dp") { GlassSettings.bandHeightDp = it }
+        slider("Bottom blur strength", 0f, 60f, GlassSettings.bandBlur, " px") { GlassSettings.bandBlur = it }
+        slider("Animation speed", 0.5f, 2f, GlassSettings.animSpeed, "x") { GlassSettings.animSpeed = it }
+
+        val scroll = android.widget.ScrollView(this)
+        scroll.addView(col)
+        val box = FrameLayout(this)
+        box.addView(
+            scroll,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                (resources.displayMetrics.heightPixels * 0.5f).toInt()
+            )
+        )
+
+        settingsOpen = true
+        handler.removeCallbacks(hideRunnable)
+        val dlg = MaterialAlertDialogBuilder(this)
+            .setTitle("Glass & blur")
+            .setView(box)
+            .setPositiveButton("Done", null)
+            .setNeutralButton("Reset") { _, _ ->
+                GlassSettings.reset()
+                applyGlassSettings()
+            }
+            .create()
+        dlg.setOnDismissListener {
+            settingsOpen = false
+            scheduleHide()
+        }
+        if (!inLibrary) {
+            dlg.window?.setDimAmount(0f)
+            dlg.window?.setGravity(Gravity.TOP)
+        }
+        dlg.show()
+    }
+
     // ---------- Frosted glass ----------
 
     private fun findTextureView(v: View): TextureView? {
@@ -1836,17 +1953,30 @@ class MainActivity : AppCompatActivity() {
 
     private fun setControlsVisible(show: Boolean) {
         if (show && locked) return
+        val wasVisible = controlsVisible && b.controls.visibility == View.VISIBLE
         controlsVisible = show
         handler.removeCallbacks(hideRunnable)
         if (show) {
             b.controls.visibility = View.VISIBLE
             ViewCompat.requestApplyInsets(b.controls)
             b.controls.animate().alpha(1f).setDuration(200).start()
+            if (!wasVisible) {
+                Fluid.controlsIn(
+                    b.topBar,
+                    listOf(b.playPause.parent as View, b.prevBtn.parent as View, b.nextBtn.parent as View),
+                    b.bottomBar, density
+                )
+            }
             startBlur()
             scheduleHide()
         } else {
             stopBlur()
             if (panelVisible) hidePanel()
+            Fluid.controlsOut(
+                b.topBar,
+                listOf(b.playPause.parent as View, b.prevBtn.parent as View, b.nextBtn.parent as View),
+                b.bottomBar, density
+            )
             b.controls.animate().alpha(0f).setDuration(250).withEndAction {
                 if (!controlsVisible) b.controls.visibility = View.GONE
             }.start()
@@ -1855,7 +1985,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun scheduleHide() {
         handler.removeCallbacks(hideRunnable)
-        if (player.isPlaying && controlsVisible && !panelVisible) {
+        if (player.isPlaying && controlsVisible && !panelVisible && !settingsOpen) {
             handler.postDelayed(hideRunnable, 3500)
         }
     }

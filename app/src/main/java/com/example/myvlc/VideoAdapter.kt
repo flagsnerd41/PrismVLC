@@ -33,6 +33,7 @@ sealed class Row {
     data class SeriesRow(val name: String, val count: Int, val cover: Uri) : Row()
     data class FolderRow(val name: String, val count: Int, val cover: Uri) : Row()
     data class VideoRow(val item: VideoItem, val progress: Float = 0f) : Row()
+    data class Hero(val item: VideoItem, val progress: Float) : Row()
 }
 
 /** Loads a video's cover; videos without one show the app icon on the icon's purple-blue. */
@@ -66,7 +67,8 @@ class LibraryAdapter(
     private val onPlaylist: (String) -> Unit,
     private val onPlaylistLong: (String) -> Unit,
     private val onNewPlaylist: () -> Unit,
-    private val onAddVideos: () -> Unit
+    private val onAddVideos: () -> Unit,
+    private val onHeroRestart: (VideoItem) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
@@ -75,6 +77,7 @@ class LibraryAdapter(
         const val T_ACTION = 2
         const val T_CARD = 3
         const val T_NOTE = 4
+        const val T_HERO = 5
     }
 
     private var rows: List<Row> = emptyList()
@@ -109,12 +112,22 @@ class LibraryAdapter(
         val progress: LinearProgressIndicator? = v.findViewById(R.id.progressBar)
     }
 
+    class HeroVH(v: View) : RecyclerView.ViewHolder(v) {
+        val thumb: ImageView = v.findViewById(R.id.heroThumb)
+        val title: TextView = v.findViewById(R.id.heroTitle)
+        val sub: TextView = v.findViewById(R.id.heroSub)
+        val resume: TextView = v.findViewById(R.id.heroResume)
+        val restart: TextView = v.findViewById(R.id.heroRestart)
+        val progress: LinearProgressIndicator = v.findViewById(R.id.heroProgress)
+    }
+
     override fun getItemCount(): Int = rows.size
 
     override fun getItemViewType(position: Int): Int = when (rows[position]) {
         is Row.Header -> T_HEADER
         is Row.Note -> T_NOTE
         is Row.NewPlaylist, is Row.AddVideos -> T_ACTION
+        is Row.Hero -> T_HERO
         is Row.PlaylistRow, is Row.SeriesRow, is Row.FolderRow, is Row.VideoRow ->
             if (listMode) T_LIST else T_CARD
     }
@@ -125,6 +138,7 @@ class LibraryAdapter(
             T_HEADER -> HeaderVH(inflater.inflate(R.layout.item_header, parent, false))
             T_NOTE -> NoteVH(inflater.inflate(R.layout.item_note, parent, false))
             T_ACTION -> ActionVH(inflater.inflate(R.layout.item_action, parent, false))
+            T_HERO -> HeroVH(inflater.inflate(R.layout.item_hero, parent, false))
             T_CARD -> ItemVH(inflater.inflate(R.layout.item_card, parent, false))
             else -> ItemVH(inflater.inflate(R.layout.item_video, parent, false))
         }
@@ -156,6 +170,21 @@ class LibraryAdapter(
             }
             is Row.Note -> {
                 (holder as NoteVH).text.text = row.text
+            }
+            is Row.Hero -> {
+                val h = holder as HeroVH
+                val item = row.item
+                h.title.text = item.title
+                val leftMin = (item.durationMs * (1f - row.progress) / 60000f).toInt()
+                val prefix = if (item.series != null)
+                    String.format("S%02dE%02d · ", item.season, item.episode) else ""
+                h.sub.text = prefix + (if (leftMin >= 1) leftMin.toString() + " min left" else "Almost done")
+                h.progress.setProgressCompat((row.progress * 100).toInt(), false)
+                loadCover(h.thumb, item.uri)
+                h.resume.setOnClickListener { press(h.resume) { onVideo(item) } }
+                h.restart.setOnClickListener { press(h.restart) { onHeroRestart(item) } }
+                h.itemView.setOnClickListener { press(h.itemView) { onVideo(item) } }
+                h.itemView.setOnLongClickListener { onVideoLong(item); true }
             }
             is Row.NewPlaylist -> {
                 val h = holder as ActionVH
