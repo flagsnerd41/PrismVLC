@@ -2,21 +2,26 @@ package com.example.myvlc
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.RuntimeShader
+import android.graphics.Shader
 import android.graphics.Typeface
+import android.os.Build
 import android.util.AttributeSet
-import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
-import androidx.core.graphics.ColorUtils
+import androidx.annotation.RequiresApi
 
 /**
- * Chunky rounded progress bar: a filled track, a gap, a slim vertical handle,
- * a gap, then the rest of the track with a dot at the end. Shows a time bubble while dragging.
+ * Slim iOS-style progress bar. At rest it is just a thin track with a bright fill.
+ * Touch it and a liquid-glass lens grows out of the track, bending the video and the
+ * track underneath it. Shows a time bubble while dragging.
  */
 class PrismSeekBar @JvmOverloads constructor(
     context: Context,
@@ -35,31 +40,28 @@ class PrismSeekBar @JvmOverloads constructor(
     private var expand = 0f
     private var animator: ValueAnimator? = null
 
-    private val activePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val thumbPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    private val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x66FFFFFF }
+    private val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true }
+    private val fallbackFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x55FFFFFF }
+    private val fallbackStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = 0xAAFFFFFF.toInt()
+        strokeWidth = 1f * d
+    }
     private val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xCC000000.toInt() }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
         typeface = Typeface.DEFAULT_BOLD
+        textSize = 13f * d
     }
     private val rect = RectF()
-    private val path = Path()
 
-    init {
-        val accent = themeColor(androidx.appcompat.R.attr.colorPrimary, 0xFF8AB4FF.toInt())
-        val container = themeColor(com.google.android.material.R.attr.colorPrimaryContainer, 0xFF0F3F9F.toInt())
-        activePaint.color = accent
-        thumbPaint.color = accent
-        inactivePaint.color = ColorUtils.setAlphaComponent(container, 235)
-        textPaint.textSize = 13f * d
-    }
-
-    private fun themeColor(attr: Int, fallback: Int): Int {
-        val tv = TypedValue()
-        return if (context.theme.resolveAttribute(attr, tv, true)) tv.data else fallback
-    }
+    private var backdropShader: BitmapShader? = null
+    private var trackBitmap: Bitmap? = null
+    private var trackCanvas: Canvas? = null
+    private var glass: Shader? = null
 
     /** Horizontal centre of the handle, in this view's own coordinates. */
     fun thumbCenterX(): Float {
@@ -75,12 +77,38 @@ class PrismSeekBar @JvmOverloads constructor(
         }
     }
 
+    /**
+     * The live video snapshot behind this view. [matrix] maps bitmap pixels to this
+     * view's own coordinates. Only used while the glass lens is showing.
+     */
+    fun setBackdrop(bmp: Bitmap, matrix: Matrix) {
+        if (expand <= 0.01f) return
+        val s = BitmapShader(bmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+        s.setLocalMatrix(matrix)
+        backdropShader = s
+        invalidate()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        trackBitmap?.recycle()
+        if (w > 0 && h > 0) {
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            trackBitmap = bmp
+            trackCanvas = Canvas(bmp)
+        } else {
+            trackBitmap = null
+            trackCanvas = null
+        }
+    }
+
     private fun animateExpand(target: Float) {
         animator?.cancel()
         val a = ValueAnimator.ofFloat(expand, target)
-        a.duration = 160
+        a.duration = 220
+        a.interpolator = android.view.animation.OvershootInterpolator(1.4f)
         a.addUpdateListener {
-            expand = it.animatedValue as Float
+            expand = (it.animatedValue as Float).coerceAtLeast(0f)
             invalidate()
         }
         animator = a
@@ -118,6 +146,7 @@ class PrismSeekBar @JvmOverloads constructor(
                     dragging = false
                     shown = fraction(e.x)
                     animateExpand(0f)
+                    backdropShader = null
                     onSeekEnd?.invoke(shown)
                     invalidate()
                 }
@@ -127,63 +156,85 @@ class PrismSeekBar @JvmOverloads constructor(
         return super.onTouchEvent(e)
     }
 
-    override fun onDraw(canvas: Canvas) {
+    /** Draws the slim track: faint full capsule, bright fill up to [x]. */
+    private fun drawTrack(c: Canvas, x: Float) {
         val pad = 14f * d
         val left = pad
         val right = width - pad
         val cy = height - 26f * d
-        val h = 16f * d
-        val outer = h / 2
-        val inner = 3f * d
-        val thumbW = (5f - 2f * expand) * d
-        val thumbH = (40f + 4f * expand) * d
-        val gap = 6f * d
-        val x = left + (right - left) * shown
+        val h = (5f + 3f * expand) * d
+        val r = h / 2f
+        rect.set(left, cy - h / 2f, right, cy + h / 2f)
+        c.drawRoundRect(rect, r, r, inactivePaint)
+        c.save()
+        c.clipRect(left, cy - h, x, cy + h)
+        c.drawRoundRect(rect, r, r, activePaint)
+        c.restore()
+    }
 
-        val activeEnd = x - thumbW / 2 - gap
-        val inactiveStart = x + thumbW / 2 + gap
+    @RequiresApi(33)
+    private fun drawGlassThumb(
+        canvas: Canvas, track: Bitmap, backdrop: BitmapShader,
+        x: Float, cy: Float, tw: Float, th: Float
+    ) {
+        val sh = (glass as? RuntimeShader) ?: LiquidGlass.newSeekShader().also { glass = it }
+        sh.setInputShader("backdrop", backdrop)
+        sh.setInputShader("track", BitmapShader(track, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
+        val l = x - tw / 2f
+        val t = cy - th / 2f
+        val small = minOf(tw, th)
+        LiquidGlass.configure(
+            sh,
+            tw, th, l, t,
+            small / 2f,
+            tw * 0.40f,
+            small * 0.5f,
+            0.10f + 0.10f * expand,
+            0.05f,
+            d,
+            expand,
+            false,
+            1f, 0.04f
+        )
+        glassPaint.shader = sh
+        canvas.drawRect(l - 2f, t - 2f, l + tw + 2f, t + th + 2f, glassPaint)
+    }
 
-        // filled part (round on the left, soft corners next to the handle)
-        if (activeEnd > left + 1f) {
-            rect.set(left, cy - h / 2, activeEnd, cy + h / 2)
-            path.reset()
-            path.addRoundRect(
-                rect,
-                floatArrayOf(outer, outer, inner, inner, inner, inner, outer, outer),
-                Path.Direction.CW
-            )
-            canvas.drawPath(path, activePaint)
-        }
+    override fun onDraw(canvas: Canvas) {
+        val pad = 14f * d
+        val cy = height - 26f * d
+        val x = pad + (width - 2 * pad) * shown
+        val tw = (6f + 36f * expand) * d
+        val th = (10f + 36f * expand) * d
 
-        // remaining part (soft corners next to the handle, round on the right) + end dot
-        if (right > inactiveStart + 1f) {
-            rect.set(inactiveStart, cy - h / 2, right, cy + h / 2)
-            path.reset()
-            path.addRoundRect(
-                rect,
-                floatArrayOf(inner, inner, outer, outer, outer, outer, inner, inner),
-                Path.Direction.CW
-            )
-            canvas.drawPath(path, inactivePaint)
-            if (right - inactiveStart > h) {
-                canvas.drawCircle(right - outer, cy, 3f * d, thumbPaint)
+        drawTrack(canvas, x)
+
+        if (expand > 0.01f) {
+            val bd = backdropShader
+            val tb = trackBitmap
+            val tc = trackCanvas
+            if (Build.VERSION.SDK_INT >= 33 && bd != null && tb != null && tc != null) {
+                tb.eraseColor(Color.TRANSPARENT)
+                drawTrack(tc, x)
+                drawGlassThumb(canvas, tb, bd, x, cy, tw, th)
+            } else {
+                rect.set(x - tw / 2f, cy - th / 2f, x + tw / 2f, cy + th / 2f)
+                canvas.drawRoundRect(rect, tw / 2f, tw / 2f, fallbackFill)
+                canvas.drawRoundRect(rect, tw / 2f, tw / 2f, fallbackStroke)
             }
         }
-
-        // handle
-        rect.set(x - thumbW / 2, cy - thumbH / 2, x + thumbW / 2, cy + thumbH / 2)
-        canvas.drawRoundRect(rect, thumbW / 2, thumbW / 2, thumbPaint)
 
         // time bubble while dragging
         if (expand > 0.05f) {
             val label = formatTime((shown * durationMs).toLong())
-            val tw = textPaint.measureText(label) + 24f * d
+            val tw2 = textPaint.measureText(label) + 24f * d
             val bh = 28f * d
-            val bx = x.coerceIn(tw / 2, width - tw / 2)
-            val bottom = cy - thumbH / 2 - 6f * d
-            bubblePaint.alpha = (204 * expand).toInt()
-            textPaint.alpha = (255 * expand).toInt()
-            rect.set(bx - tw / 2, bottom - bh, bx + tw / 2, bottom)
+            val bx = x.coerceIn(tw2 / 2, width - tw2 / 2)
+            val bottom = cy - th / 2f - 6f * d
+            val a = expand.coerceIn(0f, 1f)
+            bubblePaint.alpha = (204 * a).toInt()
+            textPaint.alpha = (255 * a).toInt()
+            rect.set(bx - tw2 / 2, bottom - bh, bx + tw2 / 2, bottom)
             canvas.drawRoundRect(rect, bh / 2, bh / 2, bubblePaint)
             canvas.drawText(label, bx, bottom - bh / 2 + textPaint.textSize * 0.35f, textPaint)
         }

@@ -33,7 +33,7 @@
             android:maxHeight="1dp"
             android:scaleType="matrix" />
 
-        <!-- Top bar: back + title + lock -->
+        <!-- Top bar: glass back + glass lock -->
         <LinearLayout
             android:id="@+id/topBar"
             android:layout_width="match_parent"
@@ -44,67 +44,65 @@
             android:paddingHorizontal="8dp"
             android:paddingTop="8dp">
 
-            <ImageButton
-                android:id="@+id/backBtn"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Back to library"
-                android:padding="10dp"
-                android:scaleType="centerInside"
-                android:src="@drawable/ic_chevron_down"
-                app:tint="@android:color/white" />
+            <FrameLayout
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="8dp">
 
-            <LinearLayout
+                <ImageView
+                    android:id="@+id/blurBack"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@null"
+                    android:maxWidth="1dp"
+                    android:maxHeight="1dp"
+                    android:scaleType="matrix" />
+
+                <ImageButton
+                    android:id="@+id/backBtn"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Back to library"
+                    android:padding="12dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_chevron_down"
+                    app:tint="@android:color/white" />
+            </FrameLayout>
+
+            <View
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="8dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
-                <TextView
-                    android:id="@+id/titleText"
+            <FrameLayout
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:layout_marginEnd="8dp">
+
+                <ImageView
+                    android:id="@+id/blurLock"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:shadowColor="#99000000"
-                    android:shadowDx="0"
-                    android:shadowDy="1"
-                    android:shadowRadius="6"
-                    android:singleLine="true"
-                    android:textColor="@android:color/white"
-                    android:textSize="17sp"
-                    android:textStyle="bold" />
+                    android:layout_height="match_parent"
+                    android:contentDescription="@null"
+                    android:maxWidth="1dp"
+                    android:maxHeight="1dp"
+                    android:scaleType="matrix" />
 
-                <TextView
-                    android:id="@+id/subtitleText"
+                <ImageButton
+                    android:id="@+id/lockBtn"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:shadowColor="#99000000"
-                    android:shadowDx="0"
-                    android:shadowDy="1"
-                    android:shadowRadius="6"
-                    android:singleLine="true"
-                    android:textColor="#B3FFFFFF"
-                    android:textSize="14sp"
-                    android:visibility="gone" />
-            </LinearLayout>
-
-            <ImageButton
-                android:id="@+id/lockBtn"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Lock controls"
-                android:padding="12dp"
-                android:scaleType="centerInside"
-                android:src="@drawable/ic_lock_open"
-                app:tint="@android:color/white" />
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Lock controls"
+                    android:padding="13dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_lock_open"
+                    app:tint="@android:color/white" />
+            </FrameLayout>
         </LinearLayout>
 
-        <!-- Center: prev / play / next (heavy frosted glass) -->
+        <!-- Center: back 10s / play / forward 10s (liquid glass) -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -121,7 +119,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:contentDescription="@null"
-                    android:foreground="@color/glass_tint"
                     android:maxWidth="1dp"
                     android:maxHeight="1dp"
                     android:scaleType="matrix" />
@@ -131,10 +128,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Previous"
-                    android:padding="15dp"
+                    android:contentDescription="Back 10 seconds"
+                    android:padding="14dp"
                     android:scaleType="centerInside"
-                    android:src="@drawable/ic_prev"
+                    android:src="@drawable/ic_replay_10"
                     app:tint="@android:color/white" />
             </FrameLayout>
 
@@ -148,7 +145,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:contentDescription="@null"
-                    android:foreground="@color/glass_tint"
                     android:maxWidth="1dp"
                     android:maxHeight="1dp"
                     android:scaleType="matrix" />
@@ -174,7 +170,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:contentDescription="@null"
-                    android:foreground="@color/glass_tint"
                     android:maxWidth="1dp"
                     android:maxHeight="1dp"
                     android:scaleType="matrix" />
@@ -184,15 +179,15 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Next"
-                    android:padding="15dp"
+                    android:contentDescription="Forward 10 seconds"
+                    android:padding="14dp"
                     android:scaleType="centerInside"
-                    android:src="@drawable/ic_next"
+                    android:src="@drawable/ic_forward_10"
                     app:tint="@android:color/white" />
             </FrameLayout>
         </LinearLayout>
 
-        <!-- Bottom: seek bar + options pill + next -->
+        <!-- Bottom: title, slim seek bar, next chip + glass options pill -->
         <LinearLayout
             android:id="@+id/bottomBar"
             android:layout_width="match_parent"
@@ -201,6 +196,36 @@
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
             android:paddingBottom="12dp">
+
+            <TextView
+                android:id="@+id/subtitleText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:paddingHorizontal="4dp"
+                android:shadowColor="#99000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="6"
+                android:singleLine="true"
+                android:textColor="#CCFFFFFF"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/titleText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:paddingHorizontal="4dp"
+                android:shadowColor="#99000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="6"
+                android:singleLine="true"
+                android:textColor="@android:color/white"
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -251,16 +276,61 @@
                 android:layout_height="wrap_content">
 
                 <FrameLayout
+                    android:id="@+id/nextPill"
                     android:layout_width="wrap_content"
                     android:layout_height="52dp"
-                    android:layout_gravity="start">
+                    android:layout_gravity="start"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/blurNextPill"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@null"
+                        android:maxWidth="1dp"
+                        android:maxHeight="1dp"
+                        android:scaleType="matrix" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Next"
+                            android:textColor="@android:color/white"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/nextThumb"
+                            android:layout_width="56dp"
+                            android:layout_height="34dp"
+                            android:layout_marginStart="8dp"
+                            android:background="@drawable/thumb_bg"
+                            android:clipToOutline="true"
+                            android:contentDescription="@null"
+                            android:scaleType="centerCrop" />
+                    </LinearLayout>
+                </FrameLayout>
+
+                <FrameLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="52dp"
+                    android:layout_gravity="end">
 
                     <ImageView
                         android:id="@+id/blurPill"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:contentDescription="@null"
-                        android:foreground="@color/glass_tint"
                         android:maxWidth="1dp"
                         android:maxHeight="1dp"
                         android:scaleType="matrix" />
@@ -328,53 +398,6 @@
                             android:scaleType="centerInside"
                             android:src="@drawable/ic_dots_h"
                             app:tint="@android:color/white" />
-                    </LinearLayout>
-                </FrameLayout>
-
-                <FrameLayout
-                    android:id="@+id/nextPill"
-                    android:layout_width="wrap_content"
-                    android:layout_height="52dp"
-                    android:layout_gravity="end"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:visibility="gone">
-
-                    <ImageView
-                        android:id="@+id/blurNextPill"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:contentDescription="@null"
-                        android:foreground="@color/glass_tint"
-                        android:maxWidth="1dp"
-                        android:maxHeight="1dp"
-                        android:scaleType="matrix" />
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="8dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Next"
-                            android:textColor="@android:color/white"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
-
-                        <ImageView
-                            android:id="@+id/nextThumb"
-                            android:layout_width="56dp"
-                            android:layout_height="34dp"
-                            android:layout_marginStart="8dp"
-                            android:background="@drawable/thumb_bg"
-                            android:clipToOutline="true"
-                            android:contentDescription="@null"
-                            android:scaleType="centerCrop" />
                     </LinearLayout>
                 </FrameLayout>
             </FrameLayout>

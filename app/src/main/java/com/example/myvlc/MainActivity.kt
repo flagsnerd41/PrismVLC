@@ -136,6 +136,7 @@ class MainActivity : AppCompatActivity() {
     private var locked = false
     private var lastPlaying = false
     private var lastSave = 0L
+    private var switchingUntil = 0L
 
     // library data
     private var allVideos: List<VideoItem> = emptyList()
@@ -251,7 +252,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(b.root)
         blurViews = listOf(
             b.blurPrev, b.blurPlay, b.blurNext, b.blurPill, b.blurNextPill, b.blurPanel,
-            b.blurBottom
+            b.blurBack, b.blurLock, b.blurBottom
         )
         audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         framePreview = FramePreview(this)
@@ -949,7 +950,7 @@ class MainActivity : AppCompatActivity() {
         backCallback.isEnabled = true
         hideLibraryAnimated()
         b.miniPlayer.visibility = View.GONE
-        lastPlaying = player.isPlaying
+        lastPlaying = player.isPlaying || SystemClock.elapsedRealtime() < switchingUntil
         setPlayIconStatic(lastPlaying)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -1067,8 +1068,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateNavButtons() {
-        b.prevBtn.alpha = if (playIndex > 0) 1f else 0.45f
-        b.nextBtn.alpha = if (hasNext()) 1f else 0.45f
+        b.prevBtn.alpha = 1f
+        b.nextBtn.alpha = 1f
         if (hasNext()) {
             b.nextPill.visibility = View.VISIBLE
             Glide.with(b.nextThumb).load(playlist[playIndex + 1].uri)
@@ -1097,6 +1098,9 @@ class MainActivity : AppCompatActivity() {
             framePreview.setSource(uri)
             hasMedia = true
             if (showUi) inLibrary = false
+            switchingUntil = SystemClock.elapsedRealtime() + 900L
+            lastPlaying = true
+            setPlayIconStatic(true)
             player.play()
             applySpeed()
             resumeIfSaved(uri)
@@ -1204,7 +1208,10 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
-            if (Build.VERSION.SDK_INT >= 31) {
+            if (Build.VERSION.SDK_INT >= 33 && !isBand) {
+                val panel = v === b.blurPanel
+                LiquidGlass.attach(v, if (panel) 24f else null, if (panel) 0.06f else 0.28f)
+            } else if (Build.VERSION.SDK_INT >= 31) {
                 val radius = if (isBand) 40f else 32f
                 v.setRenderEffect(
                     RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
@@ -1262,8 +1269,8 @@ class MainActivity : AppCompatActivity() {
         b.backBtn.setOnClickListener { showLibrary() }
         b.lockBtn.setOnClickListener { setLocked(true) }
         b.unlockBtn.setOnClickListener { setLocked(false) }
-        b.prevBtn.setOnClickListener { tick(it); nudge(b.prevBtn, -1); playPrev() }
-        b.nextBtn.setOnClickListener { tick(it); nudge(b.nextBtn, 1); playNext() }
+        b.prevBtn.setOnClickListener { tick(it); nudge(b.prevBtn, -1); seekBy(-10_000L) }
+        b.nextBtn.setOnClickListener { tick(it); nudge(b.nextBtn, 1); seekBy(10_000L) }
         b.nextPill.setOnClickListener { tick(it); playNext() }
         b.ccBtn.setOnClickListener { tick(it); showSubtitlePanel() }
         b.audioBtn.setOnClickListener { tick(it); showAudioPanel() }
@@ -1274,11 +1281,14 @@ class MainActivity : AppCompatActivity() {
 
         b.playPause.setOnClickListener {
             tick(it)
-            b.playPause.animate().scaleX(0.85f).scaleY(0.85f).setDuration(80).withEndAction {
-                b.playPause.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
-            }.start()
             if (player.isPlaying) player.pause() else player.play()
         }
+
+        // iOS-style swell: the glass bulges while a finger is on it
+        for (btn in listOf<View>(b.prevBtn, b.playPause, b.nextBtn, b.backBtn, b.lockBtn)) {
+            LiquidGlass.swell(btn)
+        }
+        LiquidGlass.swell(b.nextPill, b.nextPill)
 
         // progress bar + frame preview
         b.seekBar.onSeekStart = {
@@ -1459,7 +1469,12 @@ class MainActivity : AppCompatActivity() {
                         if (controlsVisible) startBlur()
                     }
                     MediaPlayer.Event.Paused -> { setPlayIcon(false); setControlsVisible(true) }
-                    MediaPlayer.Event.Stopped -> { setPlayIcon(false); setControlsVisible(true) }
+                    MediaPlayer.Event.Stopped -> {
+                        if (SystemClock.elapsedRealtime() > switchingUntil) {
+                            setPlayIcon(false)
+                            setControlsVisible(true)
+                        }
+                    }
                     MediaPlayer.Event.EndReached -> onEndReached()
                     MediaPlayer.Event.LengthChanged -> {
                         b.durationText.text = formatTime(e.lengthChanged)
@@ -1782,7 +1797,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateBlur() {
         val tv = textureView ?: findTextureView(b.videoLayout)?.also { textureView = it } ?: return
-        val scale = 16
+        val scale = 5
         val bw = tv.width / scale
         val bh = tv.height / scale
         if (!tv.isAvailable || bw < 2 || bh < 2) return
@@ -1800,6 +1815,12 @@ class MainActivity : AppCompatActivity() {
             m.postTranslate((tvLoc[0] - loc[0]).toFloat(), (tvLoc[1] - loc[1]).toFloat())
             v.setImageBitmap(bmp)
             v.imageMatrix = m
+        }
+        if (b.seekBar.isShown) {
+            b.seekBar.getLocationOnScreen(loc)
+            m.setScale(sx, sy)
+            m.postTranslate((tvLoc[0] - loc[0]).toFloat(), (tvLoc[1] - loc[1]).toFloat())
+            b.seekBar.setBackdrop(bmp, m)
         }
     }
 
