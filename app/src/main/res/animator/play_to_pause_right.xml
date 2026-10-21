@@ -4,5 +4,5 @@
     android:interpolator="@android:interpolator/fast_out_slow_in"
     android:propertyName="pathData"
     android:valueFrom="M13.2,8.73L19.2,12L19.2,12L13.2,15.27Z"
-    android:valueTo="M13,6L17,6L17,18L13,18Z"
+    android:valueTo="M13.8,6L16.8,6L16.8,18L13.8,18Z"
     android:valueType="pathType" />
