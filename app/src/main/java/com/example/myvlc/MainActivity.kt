@@ -138,6 +138,7 @@ class MainActivity : AppCompatActivity() {
     private var lastSave = 0L
     private var switchingUntil = 0L
     private var settingsOpen = false
+    private var settingsPage: View? = null
 
     // library data
     private var allVideos: List<VideoItem> = emptyList()
@@ -224,7 +225,8 @@ class MainActivity : AppCompatActivity() {
 
     private val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
-            if (locked) showUnlockTemporarily()
+            if (settingsPage != null) closeSettingsPage()
+            else if (locked) showUnlockTemporarily()
             else if (panelVisible) hidePanel()
             else if (!inLibrary) showLibrary()
             else if (searchVisible) closeSearch()
@@ -246,6 +248,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         density = resources.displayMetrics.density
         GlassSettings.init(prefs)
+        Gestures.init(prefs)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val wlp = window.attributes
         wlp.rotationAnimation = WindowManager.LayoutParams.ROTATION_ANIMATION_CROSSFADE
@@ -876,6 +879,7 @@ class MainActivity : AppCompatActivity() {
             "Card size: " + sizeNames[cardSize],
             "Sort by: " + sortNames[sortMode],
             "Glass & blur settings",
+            "Settings",
             "About Prism"
         )
         MaterialAlertDialogBuilder(this)
@@ -907,6 +911,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         .show()
                     4 -> showGlassSettings()
+                    5 -> openSettingsPage()
                     else -> MaterialAlertDialogBuilder(this)
                         .setTitle("Prism")
                         .setMessage(
@@ -1302,6 +1307,16 @@ class MainActivity : AppCompatActivity() {
             LiquidGlass.swell(btn)
         }
         LiquidGlass.swell(b.nextPill, b.nextPill)
+        unclipParents(
+            listOf(
+                b.prevBtn, b.playPause, b.nextBtn, b.backBtn, b.lockBtn, b.nextPill,
+                b.ccBtn, b.audioBtn, b.castBtn, b.speedBtn, b.moreBtn, b.rotateBtn
+            )
+        )
+        // the option buttons bounce when you press them
+        for (btn in listOf<View>(b.ccBtn, b.audioBtn, b.castBtn, b.speedBtn, b.moreBtn, b.rotateBtn)) {
+            pressBounce(btn)
+        }
 
         // progress bar + frame preview
         b.seekBar.onSeekStart = {
@@ -1338,7 +1353,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onDoubleTap(e: MotionEvent): Boolean {
-                if (locked || !hasMedia) return true
+                if (locked || !hasMedia || !Gestures.doubleTap) return true
                 val back = e.x < b.touchLayer.width / 2f
                 seekBy(if (back) -10_000L else 10_000L)
                 showSeekHint(back)
@@ -1373,6 +1388,11 @@ class MainActivity : AppCompatActivity() {
                     gMode = if (abs(dy) > abs(dx)) {
                         if (gDownX < b.touchLayer.width / 2f) 1 else 2
                     } else 3
+                    // a gesture that is switched off in Settings is ignored
+                    if ((gMode == 1 && !Gestures.brightness) ||
+                        (gMode == 2 && !Gestures.volume) ||
+                        (gMode == 3 && !Gestures.seek)
+                    ) gMode = -1
                 }
                 val h = maxOf(b.touchLayer.height, 1) * 0.8f
                 if (gMode == 1) {
@@ -1537,15 +1557,39 @@ class MainActivity : AppCompatActivity() {
         val lp = b.optionsPanel.layoutParams
         lp.height = (heightDp * density).toInt()
         b.optionsPanel.layoutParams = lp
-        b.optionsPanel.visibility = View.VISIBLE
+        val panel = b.optionsPanel
+        panel.pivotX = 0f
+        panel.pivotY = lp.height.toFloat()
+        panel.visibility = View.VISIBLE
         panelVisible = true
         handler.removeCallbacks(hideRunnable)
+        // the panel springs out of its button, then the rows glide in one by one
+        Fluid.scale(panel, 1f, 0.62f, 420f, from = 0.82f)
+        Fluid.spring(panel, androidx.dynamicanimation.animation.DynamicAnimation.ALPHA, 1f, 1f, 500f, from = 0f)
+        Fluid.spring(
+            panel, androidx.dynamicanimation.animation.DynamicAnimation.TRANSLATION_Y,
+            0f, 0.7f, 380f, from = 14f * density
+        )
+        for (i in 0 until b.optionsList.childCount) {
+            val row = b.optionsList.getChildAt(i)
+            val delay = 40L + minOf(i, 8) * 22L
+            Fluid.spring(row, androidx.dynamicanimation.animation.DynamicAnimation.ALPHA, 1f, 1f, 400f, from = 0f, delayMs = delay)
+            Fluid.spring(
+                row, androidx.dynamicanimation.animation.DynamicAnimation.TRANSLATION_Y,
+                0f, 0.8f, 400f, from = 10f * density, delayMs = delay
+            )
+        }
     }
 
     private fun hidePanel() {
         if (!panelVisible) return
-        b.optionsPanel.visibility = View.GONE
         panelVisible = false
+        val panel = b.optionsPanel
+        Fluid.scale(panel, 0.9f, 1f, 600f)
+        Fluid.spring(panel, androidx.dynamicanimation.animation.DynamicAnimation.ALPHA, 0f, 1f, 600f)
+        panel.postDelayed({
+            if (!panelVisible) panel.visibility = View.GONE
+        }, 200)
         scheduleHide()
     }
 
@@ -1618,7 +1662,7 @@ class MainActivity : AppCompatActivity() {
     private fun showMorePanel() {
         val labels = arrayListOf(
             "Aspect ratio", "Sleep timer", "A-B repeat", "Equalizer",
-            "Picture-in-picture", "Lock screen", "Video info", "Glass & blur settings", "Share"
+            "Picture-in-picture", "Lock screen", "Video info", "Glass & blur settings", "Share", "Settings"
         )
         showPanel(labels, -1) { i ->
             when (i) {
@@ -1633,6 +1677,7 @@ class MainActivity : AppCompatActivity() {
                     if (item != null) showInfo(item) else toast("No info for this video")
                 }
                 7 -> showGlassSettings()
+                9 -> openSettingsPage()
                 else -> {
                     val item = currentItem()
                     if (item != null) shareVideo(item) else toast("Nothing to share")
@@ -1729,6 +1774,74 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             toast("Picture-in-picture needs Android 8 or newer")
+        }
+    }
+
+    // ---------- Settings page ----------
+
+    private fun openSettingsPage() {
+        if (settingsPage != null) return
+        hidePanel()
+        val page = SettingsPage(
+            this,
+            { attr, fallback -> themeColor(attr, fallback) },
+            { closeSettingsPage() },
+            { showThemeDialog() },
+            { showGlassSettings() },
+            { showAbout() }
+        ).root
+        settingsPage = page
+        b.root.addView(
+            page,
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        )
+        page.translationX = resources.displayMetrics.widthPixels.toFloat()
+        Fluid.spring(page, androidx.dynamicanimation.animation.DynamicAnimation.TRANSLATION_X, 0f, 0.9f, 300f)
+        backCallback.isEnabled = true
+        handler.removeCallbacks(hideRunnable)
+    }
+
+    private fun closeSettingsPage() {
+        val p = settingsPage ?: return
+        settingsPage = null
+        Fluid.spring(
+            p, androidx.dynamicanimation.animation.DynamicAnimation.TRANSLATION_X,
+            resources.displayMetrics.widthPixels.toFloat(), 1f, 420f
+        )
+        p.postDelayed({ (p.parent as? ViewGroup)?.removeView(p) }, 320)
+        backCallback.isEnabled = !inLibrary || searchVisible || currentSeries != null ||
+            currentPlaylist != null || currentFolder != null || panelVisible
+        scheduleHide()
+    }
+
+    private fun showAbout() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Prism")
+            .setMessage("A frosted-glass video player built on libVLC.\n\nUnofficial, not affiliated with VideoLAN.")
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    /** Lets a growing (pressed) glass button draw outside the box of its parents. */
+    private fun unclipParents(views: List<View>) {
+        for (v in views) {
+            var p = v.parent
+            while (p is ViewGroup) {
+                p.clipChildren = false
+                p.clipToPadding = false
+                if (p === b.controls) break
+                p = p.parent
+            }
+        }
+    }
+
+    private fun pressBounce(v: View) {
+        v.setOnTouchListener { view, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> Fluid.scale(view, 0.82f, 0.55f, 800f)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> Fluid.scale(view, 1f, 0.35f, 300f)
+            }
+            false
         }
     }
 

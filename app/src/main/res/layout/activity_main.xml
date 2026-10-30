@@ -155,7 +155,7 @@
                     android:layout_height="match_parent"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="Play or pause"
-                    android:padding="22dp"
+                    android:padding="15dp"
                     android:scaleType="centerInside"
                     android:src="@drawable/ic_play"
                     app:tint="@android:color/white" />

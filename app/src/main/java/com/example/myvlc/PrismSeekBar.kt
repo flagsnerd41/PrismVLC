@@ -254,16 +254,7 @@ class PrismSeekBar @JvmOverloads constructor(
         val tc = trackCanvas
         val haveGlass = glassOk && bd != null && tb != null && tc != null
 
-        // 1. glass capsule behind the bar
-        if (haveGlass) {
-            tb!!.eraseColor(Color.TRANSPARENT)
-            drawPill(canvas, tb, bd!!, cy)
-        } else {
-            val h = 40f * d
-            rect.set(2f * d, cy - h / 2f, width - 2f * d, cy + h / 2f)
-            canvas.drawRoundRect(rect, h / 2f, h / 2f, fallbackFill)
-            canvas.drawRoundRect(rect, h / 2f, h / 2f, fallbackStroke)
-        }
+        // 1. no glass capsule any more: only the slim progress bar
 
         // 2. the slim track
         drawTrack(canvas, x)
