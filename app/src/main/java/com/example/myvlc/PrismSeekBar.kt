@@ -23,9 +23,9 @@ import kotlin.math.abs
 import kotlin.math.min
 
 /**
- * Glass progress bar. The whole bar sits in a liquid-glass capsule; touch it and a glass lens
- * springs out of the track, stretches as you drag (like a drop of liquid) and bends the video
- * and the track beneath it. Shows a time bubble while dragging.
+ * Slim progress bar with a frosted (blurred video) track. No glass capsule around it. Touch it and a
+ * glass lens springs out of the track, stretches as you drag (like a drop of liquid) and bends the
+ * video and the track beneath it. Shows a time bubble while dragging.
  */
 class PrismSeekBar @JvmOverloads constructor(
     context: Context,
@@ -50,6 +50,13 @@ class PrismSeekBar @JvmOverloads constructor(
 
     private val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
     private val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x66FFFFFF }
+    private val frostPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true }
+    private val frostVeil = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x30FFFFFF }
+    private val frostEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = 0x44FFFFFF
+        strokeWidth = 0.8f * d
+    }
     private val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true }
     private val fallbackFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x33FFFFFF }
     private val fallbackStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -69,7 +76,6 @@ class PrismSeekBar @JvmOverloads constructor(
     private var backdropShader: BitmapShader? = null
     private var trackBitmap: Bitmap? = null
     private var trackCanvas: Canvas? = null
-    private var pillGlass: Shader? = null
     private var lensGlass: Shader? = null
 
     init {
@@ -172,41 +178,31 @@ class PrismSeekBar @JvmOverloads constructor(
         return super.onTouchEvent(e)
     }
 
-    /** Draws the slim track: faint full capsule, bright fill up to [x]. */
+    /**
+     * Draws the slim track: the empty part is frosted (the blurred video shows through it),
+     * the played part is bright white up to [x].
+     */
     private fun drawTrack(c: Canvas, x: Float) {
         val pad = 14f * d
         val left = pad
         val right = width - pad
         val cy = height - 26f * d
-        val h = (5f + 3f * expand.coerceAtMost(1.2f)) * d
+        val h = (8f + 3f * expand.coerceAtMost(1.2f)) * d
         val r = h / 2f
         rect.set(left, cy - h / 2f, right, cy + h / 2f)
-        c.drawRoundRect(rect, r, r, inactivePaint)
+        val bd = backdropShader
+        if (bd != null) {
+            frostPaint.shader = bd
+            c.drawRoundRect(rect, r, r, frostPaint)
+            c.drawRoundRect(rect, r, r, frostVeil)
+            c.drawRoundRect(rect, r, r, frostEdge)
+        } else {
+            c.drawRoundRect(rect, r, r, inactivePaint)
+        }
         c.save()
         c.clipRect(left, cy - h, x, cy + h)
         c.drawRoundRect(rect, r, r, activePaint)
         c.restore()
-    }
-
-    /** The glass capsule the whole bar sits in. */
-    @RequiresApi(33)
-    private fun drawPill(canvas: Canvas, empty: Bitmap, backdrop: BitmapShader, cy: Float) {
-        val sh = (pillGlass as? RuntimeShader) ?: LiquidGlass.newSeekShader().also { pillGlass = it }
-        sh.setInputShader("backdrop", backdrop)
-        sh.setInputShader("track", BitmapShader(empty, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
-        val h = 40f * d
-        val w = width - 4f * d
-        val l = 2f * d
-        val t = cy - h / 2f
-        LiquidGlass.configure(
-            sh, w, h, l, t, h / 2f,
-            h * 0.30f * GlassSettings.refraction,
-            h * 0.5f, 0f,
-            GlassSettings.dispersion, d, 0f, false,
-            0f, GlassSettings.tint
-        )
-        glassPaint.shader = sh
-        canvas.drawRect(l - 2f, t - 2f, l + w + 2f, t + h + 2f, glassPaint)
     }
 
     /** The lens that springs out of the track while dragging. */
@@ -254,12 +250,10 @@ class PrismSeekBar @JvmOverloads constructor(
         val tc = trackCanvas
         val haveGlass = glassOk && bd != null && tb != null && tc != null
 
-        // 1. no glass capsule any more: only the slim progress bar
-
-        // 2. the slim track
+        // the slim frosted track
         drawTrack(canvas, x)
 
-        // 3. the lens
+        // the lens
         if (expand > 0.01f) {
             if (haveGlass) {
                 tb!!.eraseColor(Color.TRANSPARENT)

@@ -66,7 +66,7 @@
                     android:contentDescription="Back to library"
                     android:padding="12dp"
                     android:scaleType="centerInside"
-                    android:src="@drawable/ic_chevron_down"
+                    android:src="@drawable/ic_close"
                     app:tint="@android:color/white" />
             </FrameLayout>
 
@@ -75,9 +75,21 @@
                 android:layout_height="1dp"
                 android:layout_weight="1" />
 
+            <ImageButton
+                android:id="@+id/lockBtn"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/circle_dark"
+                android:contentDescription="Lock controls"
+                android:padding="11dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_lock_open"
+                app:tint="@android:color/white" />
+
             <FrameLayout
-                android:layout_width="46dp"
-                android:layout_height="46dp"
+                android:layout_width="156dp"
+                android:layout_height="40dp"
                 android:layout_marginEnd="8dp">
 
                 <ImageView
@@ -89,16 +101,30 @@
                     android:maxHeight="1dp"
                     android:scaleType="matrix" />
 
-                <ImageButton
-                    android:id="@+id/lockBtn"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Lock controls"
-                    android:padding="13dp"
-                    android:scaleType="centerInside"
-                    android:src="@drawable/ic_lock_open"
-                    app:tint="@android:color/white" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="14dp">
+
+                    <com.example.myvlc.VolumeSlider
+                        android:id="@+id/volumeSlider"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:progressBackgroundTint="#66FFFFFF"
+                        android:progressTint="@android:color/white"
+                        android:thumbTint="@android:color/white" />
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="6dp"
+                        android:contentDescription="Volume"
+                        android:src="@drawable/ic_volume" />
+                </LinearLayout>
             </FrameLayout>
         </LinearLayout>
 
@@ -138,7 +164,7 @@
             <FrameLayout
                 android:layout_width="80dp"
                 android:layout_height="80dp"
-                android:layout_marginHorizontal="36dp">
+                android:layout_marginHorizontal="22dp">
 
                 <ImageView
                     android:id="@+id/blurPlay"
