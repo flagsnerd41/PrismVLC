@@ -70,6 +70,62 @@
                     app:tint="@android:color/white" />
             </FrameLayout>
 
+            <FrameLayout
+                android:layout_width="wrap_content"
+                android:layout_height="46dp"
+                android:layout_marginStart="8dp">
+
+                <ImageView
+                    android:id="@+id/blurTopPill"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@null"
+                    android:maxWidth="1dp"
+                    android:maxHeight="1dp"
+                    android:scaleType="matrix" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="6dp">
+
+                    <ImageButton
+                        android:id="@+id/pipBtn"
+                        android:layout_width="38dp"
+                        android:layout_height="42dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Picture-in-picture"
+                        android:padding="9dp"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_pip"
+                        app:tint="@android:color/white" />
+
+                    <ImageButton
+                        android:id="@+id/castBtn"
+                        android:layout_width="38dp"
+                        android:layout_height="42dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Cast"
+                        android:padding="9dp"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_cast"
+                        app:tint="@android:color/white" />
+
+                    <ImageButton
+                        android:id="@+id/shareBtn"
+                        android:layout_width="38dp"
+                        android:layout_height="42dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Share"
+                        android:padding="9dp"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_share"
+                        app:tint="@android:color/white" />
+                </LinearLayout>
+            </FrameLayout>
+
             <View
                 android:layout_width="0dp"
                 android:layout_height="1dp"
@@ -85,11 +141,12 @@
                 android:padding="11dp"
                 android:scaleType="centerInside"
                 android:src="@drawable/ic_lock_open"
+                android:visibility="gone"
                 app:tint="@android:color/white" />
 
             <FrameLayout
-                android:layout_width="156dp"
-                android:layout_height="40dp"
+                android:layout_width="@dimen/vol_pill_width"
+                android:layout_height="46dp"
                 android:layout_marginEnd="8dp">
 
                 <ImageView
@@ -301,11 +358,45 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-                <FrameLayout
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="start|bottom"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <FrameLayout
+                        android:id="@+id/infoChip"
+                        android:layout_width="64dp"
+                        android:layout_height="44dp"
+                        android:layout_marginEnd="8dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:id="@+id/blurInfo"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:contentDescription="@null"
+                            android:maxWidth="1dp"
+                            android:maxHeight="1dp"
+                            android:scaleType="matrix" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:text="Info"
+                            android:textColor="@android:color/white"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </FrameLayout>
+
+                    <FrameLayout
                     android:id="@+id/nextPill"
                     android:layout_width="wrap_content"
                     android:layout_height="52dp"
-                    android:layout_gravity="start"
                     android:clickable="true"
                     android:focusable="true"
                     android:visibility="gone">
@@ -346,6 +437,7 @@
                             android:scaleType="centerCrop" />
                     </LinearLayout>
                 </FrameLayout>
+                </LinearLayout>
 
                 <FrameLayout
                     android:layout_width="wrap_content"
@@ -388,17 +480,6 @@
                             android:padding="11dp"
                             android:scaleType="centerInside"
                             android:src="@drawable/ic_audio"
-                            app:tint="@android:color/white" />
-
-                        <ImageButton
-                            android:id="@+id/castBtn"
-                            android:layout_width="44dp"
-                            android:layout_height="48dp"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:contentDescription="Cast"
-                            android:padding="11dp"
-                            android:scaleType="centerInside"
-                            android:src="@drawable/ic_cast"
                             app:tint="@android:color/white" />
 
                         <TextView
@@ -602,18 +683,33 @@
                 android:contentDescription="@null"
                 android:src="@drawable/prism_logo" />
 
-            <TextView
-                android:id="@+id/libTitle"
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
                 android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="Prism"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="30sp"
-                android:textStyle="bold" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/libTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Prism"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="30sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/libGreeting"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="15sp" />
+            </LinearLayout>
 
             <ImageButton
                 android:id="@+id/searchBtn"
@@ -792,7 +888,13 @@
             android:id="@+id/bottomNav"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:backgroundTint="?attr/colorSurfaceVariant"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/nav_glass_bg"
+            app:backgroundTint="@null"
+            app:elevation="0dp"
             app:labelVisibilityMode="labeled"
             app:menu="@menu/nav_menu" />
     </LinearLayout>

@@ -257,7 +257,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(b.root)
         blurViews = listOf(
             b.blurPrev, b.blurPlay, b.blurNext, b.blurPill, b.blurNextPill, b.blurPanel,
-            b.blurBack, b.blurLock, b.blurBottom
+            b.blurBack, b.blurLock, b.blurBottom, b.blurTopPill, b.blurInfo
         )
         audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         framePreview = FramePreview(this)
@@ -562,9 +562,28 @@ class MainActivity : AppCompatActivity() {
         b.libTitle.text = title ?: "Prism"
         b.libBack.visibility = if (detail) View.VISIBLE else View.GONE
         b.libLogo.visibility = if (detail) View.GONE else View.VISIBLE
+        b.libGreeting.visibility = if (detail) View.GONE else View.VISIBLE
+        if (!detail) b.libGreeting.text = greetingText()
         b.searchBtn.visibility = if (detail) View.GONE else View.VISIBLE
         b.searchBox.visibility = if (!detail && searchVisible) View.VISIBLE else View.GONE
         if (inLibrary) backCallback.isEnabled = detail || searchVisible
+    }
+
+    private fun greetingText(): String {
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        val name = prefs.getString("user_name", "Ilyes") ?: "Ilyes"
+        return when {
+            hour < 5 -> "Good Night, $name \uD83C\uDF19"
+            hour < 12 -> "Good Morning, $name \u2600\uFE0F"
+            hour < 18 -> "Good Afternoon, $name \uD83C\uDF24\uFE0F"
+            else -> "Good Evening, $name \uD83C\uDF19"
+        }
+    }
+
+    /** The Info chip only shows in landscape (portrait is too narrow for it). */
+    private fun updateChrome(cfg: Configuration = resources.configuration) {
+        b.infoChip.visibility =
+            if (cfg.orientation == Configuration.ORIENTATION_LANDSCAPE) View.VISIBLE else View.GONE
     }
 
     private fun toggleSearch() {
@@ -1296,6 +1315,18 @@ class MainActivity : AppCompatActivity() {
         b.speedBtn.setOnClickListener { tick(it); showSpeedPanel() }
         b.moreBtn.setOnClickListener { tick(it); showMorePanel() }
         b.rotateBtn.setOnClickListener { tick(it); toggleOrientation() }
+        b.pipBtn.setOnClickListener { tick(it); enterPip() }
+        b.shareBtn.setOnClickListener {
+            tick(it)
+            val item = currentItem()
+            if (item != null) shareVideo(item) else toast("Nothing to share")
+        }
+        b.infoChip.setOnClickListener {
+            tick(it)
+            val item = currentItem()
+            if (item != null) showInfo(item) else toast("No info for this video")
+        }
+        updateChrome()
 
         b.playPause.setOnClickListener {
             tick(it)
@@ -1307,6 +1338,7 @@ class MainActivity : AppCompatActivity() {
             LiquidGlass.swell(btn)
         }
         LiquidGlass.swell(b.nextPill, b.nextPill)
+        LiquidGlass.swell(b.infoChip, b.infoChip)
         unclipParents(
             listOf(
                 b.prevBtn, b.playPause, b.nextBtn, b.backBtn, b.lockBtn, b.nextPill,
@@ -1314,7 +1346,7 @@ class MainActivity : AppCompatActivity() {
             )
         )
         // the option buttons bounce when you press them
-        for (btn in listOf<View>(b.ccBtn, b.audioBtn, b.castBtn, b.speedBtn, b.moreBtn, b.rotateBtn)) {
+        for (btn in listOf<View>(b.ccBtn, b.audioBtn, b.castBtn, b.speedBtn, b.moreBtn, b.rotateBtn, b.pipBtn, b.shareBtn)) {
             pressBounce(btn)
         }
 
@@ -2115,6 +2147,7 @@ class MainActivity : AppCompatActivity() {
         TransitionManager.beginDelayedTransition(b.controls, t2)
         super.onConfigurationChanged(newConfig)
         grid.spanCount = computeSpan()
+        updateChrome(newConfig)
     }
 
     override fun onUserLeaveHint() {
