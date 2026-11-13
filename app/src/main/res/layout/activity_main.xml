@@ -191,11 +191,12 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+    android:layout_marginBottom="@dimen/center_lift">
 
             <FrameLayout
-                android:layout_width="56dp"
-                android:layout_height="56dp">
+                android:layout_width="48dp"
+                android:layout_height="48dp">
 
                 <ImageView
                     android:id="@+id/blurPrev"
@@ -212,16 +213,16 @@
                     android:layout_height="match_parent"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="Back 10 seconds"
-                    android:padding="14dp"
+                    android:padding="12dp"
                     android:scaleType="centerInside"
                     android:src="@drawable/ic_replay_10"
                     app:tint="@android:color/white" />
             </FrameLayout>
 
             <FrameLayout
-                android:layout_width="80dp"
-                android:layout_height="80dp"
-                android:layout_marginHorizontal="22dp">
+                android:layout_width="76dp"
+                android:layout_height="76dp"
+                android:layout_marginHorizontal="18dp">
 
                 <ImageView
                     android:id="@+id/blurPlay"
@@ -245,8 +246,8 @@
             </FrameLayout>
 
             <FrameLayout
-                android:layout_width="56dp"
-                android:layout_height="56dp">
+                android:layout_width="48dp"
+                android:layout_height="48dp">
 
                 <ImageView
                     android:id="@+id/blurNext"
@@ -263,7 +264,7 @@
                     android:layout_height="match_parent"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="Forward 10 seconds"
-                    android:padding="14dp"
+                    android:padding="12dp"
                     android:scaleType="centerInside"
                     android:src="@drawable/ic_forward_10"
                     app:tint="@android:color/white" />
@@ -305,10 +306,10 @@
                 android:shadowDx="0"
                 android:shadowDy="1"
                 android:shadowRadius="6"
-                android:singleLine="true"
                 android:textColor="@android:color/white"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:textSize="18sp"
+    android:maxLines="2"
+    android:fontFamily="@font/retro_blendy"/>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -479,7 +480,7 @@
                             android:contentDescription="Audio track"
                             android:padding="11dp"
                             android:scaleType="centerInside"
-                            android:src="@drawable/ic_audio"
+                            android:src="@drawable/ic_audio_track"
                             app:tint="@android:color/white" />
 
                         <TextView
@@ -699,7 +700,7 @@
                     android:text="Prism"
                     android:textColor="?attr/colorOnSurface"
                     android:textSize="30sp"
-                    android:textStyle="bold" />
+    android:fontFamily="@font/retro_blendy"/>
 
                 <TextView
                     android:id="@+id/libGreeting"
@@ -899,3 +900,4 @@
             app:menu="@menu/nav_menu" />
     </LinearLayout>
 </FrameLayout>
+<!-- prism_ui_v2 -->
