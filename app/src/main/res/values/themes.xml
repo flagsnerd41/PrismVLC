@@ -1,6 +1,8 @@
 <resources>
     <!-- Default: Material You (follows wallpaper on Android 12+) -->
     <style name="Theme.MyVLC" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:fontFamily">@font/retro_blendy</item>
+        <item name="fontFamily">@font/retro_blendy</item>
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
@@ -8,6 +10,8 @@
     </style>
 
     <style name="Theme.Prism.Base" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:fontFamily">@font/retro_blendy</item>
+        <item name="fontFamily">@font/retro_blendy</item>
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
