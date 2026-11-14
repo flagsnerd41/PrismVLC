@@ -5,13 +5,14 @@
     style="@style/Widget.Material3.CardView.Filled"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
+    android:layout_margin="5dp"
     android:clickable="true"
     android:focusable="true"
     app:cardBackgroundColor="?attr/colorSurfaceVariant"
-    app:cardCornerRadius="18dp"
+    app:cardCornerRadius="22dp"
     app:cardElevation="0dp"
-    app:strokeWidth="0dp">
+    app:strokeColor="#14FFFFFF"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -20,7 +21,7 @@
 
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="104dp">
+            android:layout_height="116dp">
 
             <ImageView
                 android:id="@+id/thumb"
@@ -67,7 +68,7 @@
             android:paddingEnd="12dp"
             android:textColor="?attr/colorOnSurface"
             android:textSize="14sp"
-            android:textStyle="bold" />
+    android:fontFamily="sans-serif-medium"/>
 
         <TextView
             android:id="@+id/duration"

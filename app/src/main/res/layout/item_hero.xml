@@ -9,13 +9,13 @@
     android:clickable="true"
     android:focusable="true"
     app:cardBackgroundColor="#101010"
-    app:cardCornerRadius="28dp"
+    app:cardCornerRadius="32dp"
     app:cardElevation="0dp"
     app:strokeWidth="0dp">
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="236dp">
+        android:layout_height="268dp">
 
         <ImageView
             android:id="@+id/heroThumb"
@@ -57,7 +57,7 @@
                 android:ellipsize="end"
                 android:maxLines="2"
                 android:textColor="@android:color/white"
-                android:textSize="24sp"
+                android:textSize="26sp"
                 android:textStyle="bold" />
 
             <TextView
