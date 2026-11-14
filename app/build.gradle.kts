@@ -11,10 +11,20 @@ android {
         applicationId = "com.flagsnerd.PrismTume"
         minSdk = 24
         targetSdk = 34
-        versionCode = 11
-        versionName = "11.0"
+        versionCode = (project.findProperty("vc") as String?)?.toInt() ?: 11
+        versionName = (project.findProperty("vn") as String?) ?: "11.0"
         // arm64 only = much smaller APK (fits modern phones)
         ndk { abiFilters += listOf("arm64-v8a") }
+    }
+
+    // one fixed key so every build installs over the previous one
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     compileOptions {
@@ -35,4 +45,5 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:4.16.0")
     implementation("org.videolan.android:libvlc-all:3.6.0")
     implementation("androidx.dynamicanimation:dynamicanimation:1.0.0")
+    implementation("androidx.work:work-runtime:2.9.1")
 }
